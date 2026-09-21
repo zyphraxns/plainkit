@@ -1,0 +1,49 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { TOOLS, toolHref } from '@/lib/shared/tools';
+
+const pageTitle = 'PlainKit';
+const description =
+  'Free everyday tools that run entirely in your browser. No ads, no tracking, no accounts, nothing uploaded.';
+---
+
+<BaseLayout title={pageTitle} description={description}>
+  <h1 class="index-title">Small tools that run entirely in your browser</h1>
+  <p class="index-intro">
+    No ads, no tracking, no accounts. Nothing you type is sent anywhere — every calculation happens
+    on your own device.
+  </p>
+
+  {TOOLS.length > 0 ? (
+    <ul class="index-list">
+      {TOOLS.map((item) => (
+        <li>
+          <a class="index-card" href={toolHref(item.slug)}>
+            <span class="eyebrow">{item.category}</span>
+            <span class="index-card__title">{item.title}</span>
+            <span class="index-card__summary">{item.summary}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p class="index-empty">
+      The first tools are being built right now. In the meantime, you can read{' '}
+      <a href="/about/">how this works</a>.
+    </p>
+  )}
+
+  <section class="tool__notes">
+    <h2 class="tool__notes-title">What you can count on</h2>
+    <ul class="tool__notes-body">
+      <li>No ads. Nothing on this site is trying to sell you something.</li>
+      <li>No tracking. No analytics, no cookies, no third-party scripts.</li>
+      <li>No accounts. Every tool is open the moment the page loads.</li>
+      <li>
+        Nothing leaves your device. There is no server to send your data to — the browser itself
+        blocks it.
+      </li>
+      <li>Open source under Apache-2.0, and you can host it yourself.</li>
+    </ul>
+  </section>
+</BaseLayout>

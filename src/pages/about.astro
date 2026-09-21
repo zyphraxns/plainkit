@@ -1,0 +1,67 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const pageTitle = 'About';
+const description =
+  'PlainKit is a static site with no server, no tracking and no accounts. Here is exactly how that works, and how to verify it.';
+---
+
+<BaseLayout title={pageTitle} description={description}>
+  <article class="tool">
+    <header class="tool__head">
+      <p class="eyebrow">About</p>
+      <h1 class="tool__title">How this works</h1>
+      <p class="tool__lead">
+        PlainKit is a set of everyday tools that do their work on your device. Here is what that
+        means, and how you can check it yourself.
+      </p>
+    </header>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">There is no server</h2>
+      <p class="tool__notes-body">
+        This is a static site. It is a folder of HTML, CSS and JavaScript files served straight to
+        your browser. There is no application server, no database and no user accounts, so there is
+        nowhere for your input to be stored even if we wanted to.
+      </p>
+
+      <h2 class="tool__notes-title">The browser blocks it, not us</h2>
+      <p class="tool__notes-body">
+        Every page sends a Content-Security-Policy rule called <code>connect-src 'none'</code>. That
+        tells the browser to refuse any network connection the page tries to make. So "nothing
+        leaves your device" is not a promise you have to take on faith — it is enforced by the
+        browser.
+      </p>
+      <p class="tool__notes-body">
+        To verify it, open any tool and run this in your browser console while you use it:
+      </p>
+      <code class="code-block">
+        performance.getEntriesByType('resource').filter((r) =&gt;
+        !r.name.startsWith(location.origin))
+      </code>
+      <p class="tool__notes-body">The result is an empty list. There is nothing to call out to.</p>
+
+      <h2 class="tool__notes-title">No ads, no tracking, no accounts</h2>
+      <p class="tool__notes-body">
+        There are no advertising slots, no analytics, no cookies, no session recording and no
+        third-party scripts of any kind. Every tool is open the moment the page loads, because there
+        is nothing to sign up for.
+      </p>
+
+      <h2 class="tool__notes-title">Host it yourself</h2>
+      <p class="tool__notes-body">
+        PlainKit is open source under Apache-2.0. The build produces a plain folder of static files,
+        so you can serve it from anywhere. If you prefer a container, the repository ships a
+        Dockerfile and a compose file:
+      </p>
+      <p class="tool__notes-body">
+        <code>docker compose up</code>
+      </p>
+      <p class="tool__notes-body">
+        The site then runs at <code>http://localhost:8080</code>. Without Docker, run
+        <code>npm install</code> and <code>npm run build</code>, then serve the <code>dist</code>{' '}
+        folder.
+      </p>
+    </section>
+  </article>
+</BaseLayout>

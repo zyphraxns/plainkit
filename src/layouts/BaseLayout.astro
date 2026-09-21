@@ -1,0 +1,103 @@
+---
+import '@/styles/tokens.css';
+import '@/styles/base.css';
+
+interface Props {
+  /** 页面标题，会拼到「· PlainKit」前。≤ 60 字符 */
+  title: string;
+  /** meta description。一句话，≤ 155 字符 */
+  description: string;
+  /** 当前工具 slug。传入时生成 canonical URL 并标注 <body data-tool> */
+  tool?: string;
+}
+
+const { title, description, tool } = Astro.props;
+
+const pageTitle = title === 'PlainKit' ? title : `${title} · PlainKit`;
+const canonical = tool ? new URL(Astro.url.pathname, Astro.site) : null;
+
+/**
+ * 内容安全策略。
+ *
+ * connect-src 'none' 是「数据不出设备」这条产品承诺的技术强制：
+ * 浏览器本身会拒绝页面发起的任何网络连接，用户可以自己开控制台验证。
+ * 禁止因为调试方便而放宽它。见 specs/DESIGN.md §16。
+ *
+ * 只在生产构建输出——开发环境的 Vite HMR 需要内联脚本与 WebSocket。
+ * frame-ancestors 在 <meta> 中会被忽略，因此放在 public/_headers（Cloudflare 生效）。
+ */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'none'",
+  "form-action 'none'",
+  "base-uri 'none'",
+  "object-src 'none'",
+].join('; ');
+
+const navItems = [
+  { href: '/', label: 'All tools' },
+  { href: '/about/', label: 'About' },
+] as const;
+
+/** 归一化路径：去掉尾斜杠，空字符串视为首页。两侧必须用同一套规则比较。 */
+function normalizePath(path: string): string {
+  const stripped = path.replace(/\/+$/, '');
+  return stripped === '' ? '/' : stripped;
+}
+
+const currentPath = normalizePath(Astro.url.pathname);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="referrer" content="no-referrer" />
+    {!import.meta.env.DEV && <meta http-equiv="Content-Security-Policy" content={CSP} />}
+    {canonical && <link rel="canonical" href={canonical} />}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+
+  <body data-tool={tool}>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="site-header__wordmark" href="/">
+          PlainKit
+        </a>
+        <nav class="site-nav" aria-label="Main">
+          {navItems.map((item) => (
+            <a
+              class="site-nav__link"
+              href={item.href}
+              aria-current={currentPath === normalizePath(item.href) ? 'page' : undefined}
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+      </div>
+    </header>
+
+    <main class="page">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <p>No ads, no tracking, no accounts. Everything is calculated in your browser.</p>
+        <p>
+          <a class="site-footer__link" href="/about/">
+            How this works
+          </a>
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
