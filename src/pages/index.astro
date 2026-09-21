@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
+import { href } from '@/lib/shared/paths';
 import { TOOLS, toolHref } from '@/lib/shared/tools';
 
 const pageTitle = 'PlainKit';
@@ -29,7 +30,7 @@ const description =
   ) : (
     <p class="index-empty">
       The first tools are being built right now. In the meantime, you can read{' '}
-      <a href="/about/">how this works</a>.
+      <a href={href('about/')}>how this works</a>.
     </p>
   )}
 

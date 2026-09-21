@@ -40,6 +40,16 @@ const ALLOWED_HOSTS = new Set([
 const failures = [];
 const notes = [];
 
+/**
+ * 部署基路径。Cloudflare Pages 为 '/'，GitHub Pages 镜像为 '/<仓库名>/'。
+ *
+ * 存在的意义是抓一个很隐蔽的 bug：Astro 只会给【它自己生成的】资源自动加基路径，
+ * 手写的 href="/about/" 不会加，于是镜像站上所有手写链接静默 404。
+ * 这个检查把「上线后才发现」变成「构建失败」。
+ */
+const BASE_PATH = process.env.BASE_PATH ?? '/';
+const BASE_PREFIX = BASE_PATH.endsWith('/') ? BASE_PATH : `${BASE_PATH}/`;
+
 function fail(message) {
   failures.push(message);
 }
@@ -88,6 +98,16 @@ function refsIn(html) {
     for (const match of html.matchAll(re)) refs.push({ kind, url: match[1] });
   }
   return refs;
+}
+
+/** 提取 HTML 里所有根相对（以 / 开头但非 //）的 href / src 值。 */
+function rootRelativeUrlsIn(html) {
+  const urls = [];
+  for (const match of html.matchAll(/\s(?:href|src)="([^"]+)"/g)) {
+    const url = match[1];
+    if (url.startsWith('/') && !url.startsWith('//')) urls.push(url);
+  }
+  return urls;
 }
 
 // ── 主流程 ────────────────────────────────────────────────────────────────
@@ -164,6 +184,18 @@ for (const htmlFile of htmlFiles) {
   }
   if (/\sstyle="/i.test(html)) {
     fail(`${label} 含内联 style="..." 属性。CSP 会拦掉，改用 class 或 CSSOM。`);
+  }
+
+  // 基路径前缀检查（仅在部署到子路径时有意义，例如 GitHub Pages 镜像）
+  if (BASE_PREFIX !== '/') {
+    for (const url of rootRelativeUrlsIn(html)) {
+      if (url.startsWith(BASE_PREFIX)) continue;
+      fail(
+        `${label} 引用了 ${url}，但它没有带部署基路径 ${BASE_PREFIX}。` +
+          `Astro 不会给手写的 href/src 自动加基路径，镜像站上会 404。` +
+          `改用 src/lib/shared/paths.ts 的 href() 生成这个链接。`,
+      );
+    }
   }
 }
 

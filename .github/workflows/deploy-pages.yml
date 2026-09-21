@@ -38,6 +38,12 @@ jobs:
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
 
+      # 镜像构建也必须过门禁。这一步专门抓「手写链接漏加基路径」——
+      # 那种 bug 只在子路径部署时才暴露，主站构建发现不了。
+      - run: npm run budget
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

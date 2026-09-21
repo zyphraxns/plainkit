@@ -501,7 +501,6 @@ import { CARD_TICK_SPACING } from './constants';
 - **唯一例外**：`*.astro` 组件文件通过 Astro 的隐式默认导出机制被导入（`import X from './X.astro'` 是框架要求），这不是我们写的 `export default`，无需处理。
 
 ### 5.6 `BaseLayout` 的 props 契约
-
 ```ts
 interface Props {
   /** 页面标题，会拼到 "· PlainKit" 前。≤ 60 字符 */
@@ -516,6 +515,38 @@ interface Props {
 **这三个 prop 是机械一致性的保证**：`title` 和 `description` 是必填的，类型检查会拦住漏传；`tool` 传入时生成 canonical URL 并给 `<body>` 打上 `data-tool`，供工具级样式钩子和将来更复杂的导航使用。
 
 > 这就是选 Astro 而不是原生 HTML 多页面的原因：**外壳只有一份，槽位由类型系统强制填满。** 50 个工具页不可能各写各的头部。
+
+### 5.7 站内链接必须走 `href()`（**极易漏，且只在镜像站上暴露**）
+
+本项目同一份代码部署到两个基路径不同的地方：
+
+| 部署 | 基路径 |
+|---|---|
+| Cloudflare Pages（主站） | `/` |
+| GitHub Pages（镜像） | `/plainkit/` |
+
+**Astro 只会给「它自己生成的」资源（例如打包后的 CSS）自动加基路径。手写的 `href="/about/"` 不会被加上——在镜像站上直接 404。**
+
+```astro
+// ❌ 禁止
+<a href="/about/">How this works</a>
+<link rel="icon" href="/favicon.svg" />
+
+// ✅ 必须
+import { href } from '@/lib/shared/paths';
+
+<a href={href('about/')}>How this works</a>
+<link rel="icon" href={href('favicon.svg')} />
+```
+
+**这条规则对本项目格外重要**：50 个工具页每个都要写「返回全部工具」的链接，漏一次就是一个 404。
+
+**已经有两道防线**：
+
+1. `scripts/check-budget.mjs` 在 `BASE_PATH != '/'` 时会检查所有根相对 `href` / `src` 是否带基路径前缀，不带就**构建失败**
+2. `.github/workflows/deploy-pages.yml` 会用 `BASE_PATH=/<仓库名>/` 构建并跑门禁——**只有子路径构建才暴露这个 bug，主站构建发现不了**
+
+> 记住：这个 bug 在本地 `npm run dev` 和主站上是**完全看不见的**。不要靠"我看过没问题"来判断，必须靠上面两道防线。
 
 ---
 
@@ -1467,6 +1498,7 @@ src/lib/tools/<A>/  ──▶  src/lib/tools/<B>/  ❌ 禁止（需要共用就�
 - [ ] `src/lib/` 下没有 `document` / `window` / `navigator`
 - [ ] 没有 `innerHTML`
 - [ ] 没有 `style="..."` 内联属性
+- [ ] **所有站内链接与静态资源引用都走了 `href()`**（见 §5.7，漏了会在镜像站上 404）
 - [ ] 每个 AC 都有以 `AC-xxx:` 开头的测试
 - [ ] `format` → `typecheck` → `test` → `build` → `budget` 全部通过
 - [ ] 已用 `agent-browser` 截图，并给了用户验收清单
