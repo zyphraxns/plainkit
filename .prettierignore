@@ -1,0 +1,20 @@
+# 构建产物与依赖
+dist
+node_modules
+package-lock.json
+
+# 中文文档：Prettier 会重排表格与列表，破坏排版，且收益为零
+specs
+docs
+PROJECT-BRIEF.md
+
+# 法律文本：必须与官方原文逐字一致，禁止任何重排
+LICENSE
+NOTICE
+
+# 静态资源与工具数据
+public
+*.html
+
+# 工具自身的运行数据，不是项目源码
+.workbuddy

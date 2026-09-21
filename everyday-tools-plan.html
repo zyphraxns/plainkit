@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>普通人工具箱 · 需求调研与首批选品</title>
+<style>
+:root{
+  --bg:#ffffff; --surface:#f7f7f5; --line:#e3e2dd; --line2:#cfcec7;
+  --text:#1c1c1a; --muted:#6b6a64; --hint:#94938c;
+  --teal:#0F6E56; --teal-bg:#E1F5EE;
+  --red:#A32D2D; --red-bg:#FCEBEB;
+  --blue:#185FA5; --blue-bg:#E6F1FB;
+  --amber:#854F0B; --amber-bg:#FAEEDA;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.8;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1020px;margin:0 auto;padding:48px 26px 80px}
+header{border-bottom:1px solid var(--line);padding-bottom:26px}
+h1{font-size:26px;font-weight:500;margin:0 0 10px;letter-spacing:-0.01em}
+.sub{color:var(--muted);font-size:14.5px;margin:0}
+.meta{margin-top:12px;font-size:12.5px;color:var(--hint)}
+h2{font-size:18px;font-weight:500;margin:52px 0 6px;display:flex;align-items:baseline;gap:10px}
+h2 .n{font-size:12px;color:var(--hint)}
+.h2sub{color:var(--muted);font-size:14px;margin:0 0 18px}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.65}
+th{font-weight:500;color:var(--muted);font-size:12.5px;background:var(--surface)}
+.bad{color:var(--red)}
+.ok{color:var(--teal)}
+.box{border-radius:12px;padding:18px 22px;margin-top:20px;font-size:14px;line-height:1.8}
+.box.red{background:var(--red-bg);color:#791F1F}
+.box.teal{background:var(--teal-bg);color:#0F6E56}
+.box.blue{background:var(--blue-bg);color:#0C447C}
+.box.amber{background:var(--amber-bg);color:#633806}
+.box b{font-weight:500}
+.box h3{font-size:15px;font-weight:500;margin:0 0 8px}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 22px 18px;margin-top:24px}
+.note h3{font-size:15px;font-weight:500;margin:20px 0 8px}
+.note ol,.note ul{margin:0;padding-left:20px;font-size:14px;color:var(--muted)}
+.note li{margin-bottom:8px}
+.note b{color:var(--text);font-weight:500}
+.pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:16px}
+.pcard{border:1px solid var(--teal);border-radius:12px;padding:18px 20px;background:var(--teal-bg)}
+.pcard h3{margin:0 0 6px;font-size:15px;font-weight:500;color:var(--teal)}
+.pcard p{margin:0;font-size:13.5px;color:#0F6E56;line-height:1.75}
+.pcard .why{display:block;margin-top:8px;font-size:12.5px;color:#085041}
+.dead{border:1px solid var(--red);border-radius:12px;padding:16px 18px;background:var(--red-bg);font-size:13.5px;color:#791F1F;line-height:1.7}
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--hint);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>普通人工具箱 · 需求调研与首批选品</h1>
+  <p class="sub">目标人群是<b>不是开发者的普通人</b>，形态是纯静态网页工具集（无广告、无追踪、全部在浏览器本地计算）。这份文件解决一个问题：<b>第一批到底做哪 5 个工具</b>。</p>
+  <p class="meta">调研时间 2026-09-19 · 数据源：计算器赛道流量分析、零点击搜索研究、主流工具站竞品对比</p>
+</header>
+
+<h2><span class="n">零</span> 已经钉死的共识</h2>
+<table>
+  <tr><th style="width:110px">项</th><th>决定</th></tr>
+  <tr><td>首要目标</td><td>真实用户优先（50 个真用户在用 &gt; 500 个星但零反馈）</td></tr>
+  <tr><td>量化目标</td><td><b>3 个月：20 个真实用户；12 个月：300–500 星</b><br><span style="color:#A32D2D">（已修订：原定 3 个月同时达成，经复核证伪——见第七节）</span></td></tr>
+  <tr><td>投入</td><td>每周 5–8 小时，坚持 3 个月以上</td></tr>
+  <tr><td>差异化</td><td>更省事（零安装、零配置、默认就能用），其次好看</td></tr>
+  <tr><td>人群</td><td>不是开发者的普通人</td></tr>
+  <tr><td>AI 的角色</td><td>核心全确定性；挑 2–3 个「结果可验证」的场景加 AI 增强，第一版不做</td></tr>
+  <tr><td>选品依据</td><td><b>传播性驱动</b>——「这个结果值不值得截图发出去？」为主；搜索量仅作长期参考<br><span style="color:#A32D2D">（已修订：原为搜索需求驱动，经复核证伪——见第七节）</span></td></tr>
+  <tr><td>语言</td><td>英文界面优先，中文版第二期</td></tr>
+  <tr><td>发布节奏</td><td>先发 5 个，之后每周加 2–3 个，每次更新都发一次公告</td></tr>
+  <tr><td>底线</td><td>无广告、无追踪、无注册、全部本地计算（这条是对满屏广告的小工具网站的杀伤性差异）</td></tr>
+</table>
+
+<h2><span class="n">一</span> 先说一个会让项目白干的发现</h2>
+<div class="box red">
+  <h3>65% 的 Google 搜索不会点进任何网站</h3>
+  2022 年的研究是 65%，2025 年分析师估计超过 70%。而<b>「计算器、货币换算、单位换算、天气、时区」被明确列为 Google 直接在搜索页给出答案的类目</b>——影响等级是「极端」。<br><br>
+  <b>这意味着：单纯的单位换算器、货币换算器、简单百分比计算器，是死路。</b>用户在搜索页就拿到答案了，根本不会点进你的网站。你做出来排名再好也是零流量。<br><br>
+  这不是理论——你自己试试：搜「15 USD to GBP」，Google 直接弹出换算框；搜「how many ounces in a pound」，答案就在最上面。
+</div>
+
+<div class="box teal">
+  <h3>那什么工具还活着？四条筛选线</h3>
+  <b>1. 需要多个输入。</b>用户要填好几项才能得到结果——Google 无法替他填。<br>
+  <b>2. 产出一个以上的结果，或者产出一张表/一张图。</b>不是单一数字。<br>
+  <b>3. 需要来回交互。</b>比如粘贴一大段文本再处理、反复调整参数看变化。<br>
+  <b>4. 涉及隐私或大文件。</b>图片、PDF、批量数据——用户不愿意上传到陌生服务器，而这恰好是本地计算的最强卖点。<br><br>
+  行业研究给的原话是：<b>「提供 AI 无法复制的工具、计算器、测验或交互体验」</b>——这正是我们这类项目的生存空间。
+</div>
+
+<h2><span class="n">二</span> 需求热度分布（来自计算器赛道流量分析）</h2>
+<table>
+  <tr><th>类目</th><th>需求</th><th>代表工具</th><th>判断</th></tr>
+  <tr><td>金融财务</td><td>最高</td><td>贷款 / 房贷 / 复利 / 储蓄 / 投资回报</td><td class="bad">避开。公式复杂、错了要赔钱、竞品（Bankrate 等）权威度碾压，新手做这个风险极高</td></tr>
+  <tr><td>换算</td><td>很高</td><td>单位 / 货币 / 温度 / 时区</td><td class="bad">死区。Google 直接给答案</td></tr>
+  <tr><td>健康健身</td><td>很高</td><td>BMI / 卡路里 / 体脂 / 饮水 / 孕期</td><td class="bad">谨慎。Google 有健康检查面板，且涉及健康建议有责任风险</td></tr>
+  <tr><td>教育学术</td><td>高</td><td>GPA / 百分比 / 分数 / 统计 / 概率 / 代数</td><td class="ok">主战场。多输入、需要步骤、学生是高频用户</td></tr>
+  <tr><td>日期时间</td><td>高</td><td>日期差 / 工作日 / 年龄 / 倒计时</td><td class="ok">可做。做成「工作日计算 + 多格式输出」就不在死区里</td></tr>
+  <tr><td>文本处理</td><td>中高</td><td>字数统计 / 大小写转换 / 去重 / 排序 / 查找替换</td><td class="ok">可做。需要粘贴大段文本 = 交互型，Google 吃不掉</td></tr>
+  <tr><td>商业营销</td><td>中</td><td>利润 / ROI / 盈亏平衡 / 定价</td><td>次要。普通人不太用，企业用户又看不上你的站</td></tr>
+  <tr><td>文件处理</td><td>中高</td><td>PDF 合并压缩 / 图片压缩转换 / CSV 转 JSON</td><td class="ok">隐私卖点最强（「文件不上传」），但实现成本最高，放第二批以后</td></tr>
+</table>
+
+<h2><span class="n">三</span> 工具候选清单</h2>
+<p class="h2sub">按「是否活得下来」标注。<b>死区 = Google 直接给答案，做了也没流量。</b></p>
+<table>
+  <tr><th style="width:60px">状态</th><th>工具</th><th>为什么有需求 / 为什么不能做</th></tr>
+  <tr><td class="bad">死区</td><td>单位换算、货币换算、温度换算、简单四则运算</td><td>Google 内置答案框，零点击率接近 100%</td></tr>
+  <tr><td class="bad">死区</td><td>「X 的 Y% 是多少」单一百分比</td><td>同上。除非做成多场景套件</td></tr>
+  <tr><td class="ok">可做</td><td>成绩计算器（GPA / 加权平均 / 「期末要考多少才能拿 A」）</td><td>多门课 + 学分，多输入；开学季搜索量爆发；学生真刚需</td></tr>
+  <tr><td class="ok">可做</td><td>日期时长计算器（间隔天数 / 工作日 / 排除节假日 / 多格式输出）</td><td>高频；「两个日期之间有几个工作日」这一类 Google 给不准</td></tr>
+  <tr><td class="ok">可做</td><td>百分比套件（折扣 / 涨跌 / 反向百分比 / 小费分摊）</td><td>小费分摊、多人 AA 是多输入场景，Google 吃不掉</td></tr>
+  <tr><td class="ok">可做</td><td>化学工具（配平方程式 / 摩尔质量 / 产率 / 有效数字）</td><td>需要步骤展示；学生刚需；你有学科场景理解；AI 增强的最佳候选</td></tr>
+  <tr><td class="ok">可做</td><td>文本清洗台（去重行 / 排序 / 去空行 / 大小写 / 批量替换 / 字数统计）</td><td>粘贴大段文本 = 交互型；开发者和普通人都用</td></tr>
+  <tr><td class="ok">可做</td><td>倒计时 / 纪念日（「距离 X 还有多少天」+ 可分享卡片）</td><td>输出是卡片/图，不是数字；自带传播性</td></tr>
+  <tr><td class="ok">可做</td><td>随机数 / 抽签 / 分组（随机点名、随机分组、抽奖）</td><td>老师、活动组织者刚需；交互型</td></tr>
+  <tr><td class="ok">可做</td><td>时区会议规划（多城市重叠工作时间）</td><td>远程工作者刚需；多输入多输出。但注意跟「时区换算」这个死区区分开——单个时区换算别做</td></tr>
+  <tr><td class="ok">后期</td><td>图片压缩 / 格式转换（本地处理）</td><td>隐私卖点极强（「你的照片不会离开电脑」），但实现和调试成本高</td></tr>
+  <tr><td class="ok">后期</td><td>PDF 合并 / 拆分 / 压缩（本地处理）</td><td>同上。且市面上 PDF 站全是「上传后让你注册」，本地版是真实差异</td></tr>
+  <tr><td class="ok">后期</td><td>CSV / JSON 互转 + 差异对比</td><td>偏开发者，但普通人（做表格的）也用</td></tr>
+  <tr><td class="bad">避开</td><td>贷款 / 房贷 / 税务计算</td><td>算错要赔钱；权威竞品有牌照和专业背书，你扛不住</td></tr>
+  <tr><td class="bad">避开</td><td>BMI / 卡路里 / 医疗相关</td><td>Google 有健康面板；且健康建议有责任风险，不适合学生作者</td></tr>
+</table>
+
+<h2><span class="n">四</span> 首批 5 个（第一个月上线）</h2>
+<p class="h2sub"><b>选品标准已改</b>：<span style="color:#0F6E56">结果可分享（有人愿意截图发出去吗）</span> × 普通人真会用 × 你能不读代码就验证它对不对 × 一周内能做完。<b><span style="color:#A32D2D">原标准里的「搜索量」已作废。</span></b></p>
+<div class="pick">
+  <div class="pcard">
+    <h3>1. 成绩与目标分数计算器</h3>
+    <p>输入各科目成绩和学分，算加权平均；反向算「期末要考多少分才能把总评拉到目标」。</p>
+    <span class="why">分享点：「我期末要考 78 分才能保住 A」——这种结果学生真的会截图发给同学。多输入，Google 替不了。</span>
+  </div>
+  <div class="pcard">
+    <h3>2. 倒计时 / 纪念日卡片</h3>
+    <p>输入一个日期，生成一张好看的倒计时卡片（可保存图片、可复制链接）。</p>
+    <span class="why">分享点最强的一个：<b>产出本身就是一张图</b>，是为分享而生的工具。高考倒计时、恋爱纪念日、项目上线倒计时都有人发。</span>
+  </div>
+  <div class="pcard">
+    <h3>3. 化学工具（配平 + 摩尔质量）</h3>
+    <p>输入方程式自动配平并展示步骤；算摩尔质量、浓度、产率，带有效数字检查。</p>
+    <span class="why">分享点：配平步骤图可以直接发到班级群。你有学科场景理解，且是将来加 AI 增强（「解释这一步为什么」）的最佳位置。</span>
+  </div>
+  <div class="pcard">
+    <h3>4. 日期时长计算器</h3>
+    <p>两个日期之间：多少天、多少工作日、多少周；正着算倒着算都行。</p>
+    <span class="why">分享点：「我们认识 1000 天了」「距离毕业还有 217 天」——带情感的数字会被发出去。多格式输出也让它在死区之外。</span>
+  </div>
+  <div class="pcard">
+    <h3>5. 随机分组 / 抽签器</h3>
+    <p>粘贴名单，随机分成 N 组、随机抽几个人、抽奖、随机排序。</p>
+    <span class="why">分享点：分组结果天然要发给其他人（老师发给班级、组织者发给群）。这是少数「不用分享就失去意义」的工具类型。</span>
+  </div>
+</div>
+<div class="box amber" style="margin-top:16px">
+  <b>从首批降级的两个：</b>百分比套件、文本清洗台。它们都是好工具，但<b>结果没人会截图分享</b>——用完就走，不产生传播。放到第二个月补齐。
+</div>
+
+<h2><span class="n">五</span> 第二个月的两个（预留隐私牌）</h2>
+<div class="note">
+  <h3>等首批上线、拿到真实反馈后再做</h3>
+  <ul>
+    <li><b>图片压缩 / 格式转换（本地处理）</b>——卖点是「照片不离开你的电脑」。市面上同类站全都要上传，这是硬差异。</li>
+    <li><b>PDF 合并 / 拆分 / 压缩（本地处理）</b>——同上，且竞品普遍用「上传完才告诉你注册」的套路，用户怨气重。</li>
+  </ul>
+  <h3>另有第四节降级下来的两个</h3>
+  <p style="margin:0;font-size:14px;color:var(--muted)"><b>百分比套件</b>、<b>文本清洗台</b>——都是好工具，但结果没人会截图分享，用完就走，不产生传播。</p>
+  <p style="margin:10px 0 0;font-size:13px;color:var(--red)"><b>2026-09-21 修订</b>：本节原列「三个」，其中「倒计时卡片生成器」已在第四节作为首批工具 2 上线，属重复条目，已删除。同理，本文档第七节「名字建议」里提的 <code>.com / .tools</code> 后缀已作废——定稿走 <code>.app</code>（见 PROJECT-BRIEF.md 一、项目卡片）。</p>
+</div>
+
+<h2><span class="n">六</span> 一个必须现在就知道的矛盾</h2>
+<div class="box amber">
+  <h3>普通人不会给你 star</h3>
+  你选了「不是开发者的普通人」作为人群（Q5），又定了「第一年 300–500 个 GitHub 星」（Q2）。<b>这两个目标在打架</b>：普通人用完就走，他们根本不知道 GitHub 是什么，更不会去给你点星。给你点星的只会是开发者——他们逛 GitHub 时觉得你的项目干净、技术做得漂亮，才会顺手一点。<br><br>
+  <b>解法：做成「普通人爱用、开发者愿意 star」的东西。</b>具体是三条：<br>
+  ① 选品偏向开发者也会用到、但主要服务普通人的工具（文本清洗、批量处理、本地文件处理都属于这类）；<br>
+  ② 技术上做到让人挑不出毛病：纯静态、零依赖、秒开、可自托管、代码干净——这些是开发者给你星的理由；<br>
+  ③ 首页显著位置写清「无广告、无追踪、不上传、开源、可自托管」——这句话同时打动两类人。<br><br>
+  it-tools 就是这么赢的：它服务开发者，但普通人也在用。反过来走不通。
+</div>
+
+<h2><span class="n">七</span> 名字建议</h2>
+<div class="note">
+  <h3>短、好记、能以 .com 或 .tools 拿到</h3>
+  <ul>
+    <li><b>PlainKit</b> —— plain（朴素干净）+ kit（工具箱），直接传达「干净的工具集」，我的第一推荐</li>
+    <li><b>PocketTools</b> —— 口袋工具，好记，但略长且常见词可能已被占</li>
+    <li><b>EverydayKit</b> —— 直白，但四个音节偏长</li>
+    <li><b>NeatTools</b> —— neat 有「整洁」的意思，双关</li>
+  </ul>
+  <b>命名三条硬规则：</b>① 两个音节以内最好；② 读得出、拼得出（别人听一次就能搜到）；③ 网站名和仓库名必须一致，别让人对不上号。
+</div>
+
+<h2><span class="n">八</span> 2026-09-19 深度复核：被推翻的决策</h2>
+<div class="box red">
+  <h3>被证伪的假设 1：「按搜索量选工具」</h3>
+  整个方案原本建立在一个没说出口的假设上——工具靠 Google 搜索被找到。实测数据把这个假设打穿了：<b>新域名需要 9–18 个月才有实质 SEO 结果</b>；Ahrefs 研究 200 万个关键词后得出，<b>只有 5.7% 的新页面能在一年内进入前十</b>，而前十名的页面平均年龄超过两年。<br><br>
+  <b>你的项目周期是 3 个月。按搜索量选出来的工具，在 3 个月内一个搜索用户都不会有。</b><br>
+  <b>已改：</b>选品标准从「搜索量」改为「传播性」——这个结果值不值得截图发出去。首批工具已按新标准重排（倒计时卡片和随机分组升上来，百分比套件和文本清洗台降级）。
+</div>
+<div class="box amber">
+  <h3>被证伪的假设 2：「单位换算是死区」</h3>
+  我上一轮说得太绝对。零点击影响的是<b>直接答案型查询</b>（"5 km to miles"），但<b>导航型查询</b>（"unit converter"）用户仍然会点进工具站——RapidTables 这类站靠这个活了十几年。<br><br>
+  <b>所以这不是「类目问题」，是「时间尺度问题」：单位换算长期仍有流量，只是新站短期内拿不到。</b><br>
+  <b>已改：</b>死区标记从「做了也没用」改为「短期拿不到流量，属长期资产」。等站点有了权重再补，不占首批名额。
+</div>
+<div class="box amber">
+  <h3>被证伪的假设 3：「3 个月内同时拿到用户和 300 星」</h3>
+  这两个目标需要的渠道是分裂的：普通人靠内容和搜索慢慢来，star 靠开发者社区的一次爆发。3 个月内同时满足不现实。<br>
+  <b>已改：</b>拆解成两个时间点——<b>3 个月只承诺 20 个真实用户；300–500 星的目标延长到 12 个月</b>。这不是放弃，是排期。
+</div>
+<div class="box teal">
+  <h3>新增机制：每个工具必须有一个「可分享产物」</h3>
+  既然 3 个月内 SEO 指望不上、内容传播又不可控，唯一能自己掌握的增长机制就是<b>让工具的结果本身值得被分享</b>——一张卡片、一张图、一个可复制的链接、一个天然要发给别人的分组结果。<br><br>
+  <b>这是一条硬规则，写进每个工具的设计要求里：如果做完之后没人会把它发出去，这个工具就不进首批。</b>
+</div>
+<div class="box blue">
+  <h3>证伪条件与撤退信号（到时间就检查，别硬扛）</h3>
+  <ul style="margin:0;padding-left:20px">
+    <li><b>检查点：工具站上线满 4 周。</b>如果内容带来的独立访客 &lt; 50 人，说明传播策略无效——停止加新工具，转向「开发者工具」或「垂直社区渗透」。</li>
+    <li><b>最大风险：内容创作吃掉开发时间。</b>触发信号是<b>连续两周没有发布新工具</b>。一旦出现，立刻砍掉内容产出，回到只做工具。</li>
+    <li><b>这条结论会被推翻的条件：</b>如果你在上线第 2 周就获得一次爆发式曝光（上 Hacker News 首页或被大号转发），那么 300 星可以提前达成，届时应把全部精力投入承接流量（补工具、修 bug），而不是继续做内容。</li>
+  </ul>
+</div>
+
+<h2><span class="n">九</span> 零预算启动包（托管 / Reddit / 免费资源）</h2>
+<p class="h2sub">约束更新：预算基本为 0；只做事件驱动的发帖（项目发布和更新时），不做持续内容产出。</p>
+
+<div class="box teal">
+  <h3>托管：两个都配，成本都是 0</h3>
+  <b>主站用 Cloudflare Pages。</b>免费、全球 CDN、加载快、自带 HTTPS、支持自定义域名，构建额度对个人项目绰绰有余。工具站的用户是全球普通人，首屏速度直接影响他们留不留下来。<br><br>
+  <b>同时保留 GitHub Pages 作为镜像。</b>理由不是备份，是<b>信任</b>——在开发者社区里，<code>xxx.github.io</code> 一眼就是开源项目，而一个独立域名容易被当成营销站。你在 Reddit 发帖时可以两个链接都给，让人自己选。<br><br>
+  <b>域名先别买。</b>见下面的学生包，能免费拿到。
+</div>
+
+<div class="box blue">
+  <h3>GitHub 学生包：你现在就该去申请（免费域名 + 免费 AI 工具）</h3>
+  <b>资格：13 岁以上、在读即可，高中也算</b>，不要求计算机专业。用学校邮箱或在读证明（学生证照片、在读证明、学费收据）申请，审核通常几小时到几天。<br><br>
+  2026 年包里跟这个项目直接相关的：<br>
+  • <b>Namecheap 免费 .me 域名 1 年 + SSL</b><br>
+  • <b>Name.com 免费域名</b>（25+ 后缀，含 .app / .dev / .studio）<br>
+  • <b>免费 .TECH 域名 1 年</b><br>
+  • GitHub Copilot 免费、Cursor Pro 免费 1 年、JetBrains 全套、Canva Pro 1 年<br><br>
+  <b>注意一个坑：</b>只领<b>一个</b>好域名然后真的用起来，别因为免费就领三个。另外记下续费价格——第二年是要花钱的。<br>
+  <b>另注：</b>DigitalOcean 的 200 美元额度已于 2026-07-31 从包里移除，别照着旧攻略找了。
+</div>
+
+<div class="box amber">
+  <h3>Reddit 发帖：你的计划可行，但有个必须先做的前置动作</h3>
+  <b>新账号第一次就发产品链接，会被自动 spam 过滤 + 人工删帖。这不是运气问题，是机制。</b><br>
+  <span style="color:#0F6E56"><b>但你的账号有历史、有 karma，这条不适用——不需要等 2–4 周养号，可以直接进入下一步。</b></span>（comment karma 是全局统计的，不分板块，所以在游戏板块攒的同样有效。）<br><br>
+  <b>但要补一件事：发帖前花 15 分钟审计每个目标板块。</b>① 把侧边栏规则完整读一遍（少数板块要求「在本板块获得的 karma」，这种就得另说）；② 按 Hot 排序看前十帖，摸清它们用什么格式和语气；③ 搜一下有没有人发过类似工具、评论区反响如何；④ 看版主最近是否活跃——活跃意味着执行更严。别跳过这步，它比多写两个工具划算。<br><br>
+  <b>推荐发帖的板块（按优先级）：</b><br>
+  ① <b>r/InternetIsBeautiful</b> —— 最适合。它的用户是最接近「普通人」的一群人，规则也友好：只要工具酷、加载快、移动端能用、<b>不要注册才能看到东西</b>（这最后一条你天然满足）。<br>
+  ② <b>r/SideProject</b>（26 万人）—— 少数<b>允许在主信息流发自己项目</b>的社区，这本来就是它存在的意义。要求：说清你做了什么、给谁用、并且也要给别人的项目留真实反馈（只发自己链接的账号照样被当 spam）。<br>
+  ③ <b>r/IMadeThis</b> —— 允许，但必须说明制作过程。<br><br>
+  <b>明确别去的（会删帖，严重的封号）：</b>r/webdev（只在「Showoff Saturday」周帖允许，还要 100+ karma 和 30 天账号）、r/programming（禁止产品推广）、r/startups（只在月度置顶帖）、r/SaaS（60 天一次）。<br><br>
+  <b>发帖格式（照抄这个结构）：</b>「我做了 X 来解决 Y 问题」+ 一个诚实的细节（踩了什么坑、某个真实数字）+ 明确说「这是我做的」+ 链接。链接放在最后，正文本身要有信息量。<br>
+  <b>时间：</b>周二到周四发帖，美东时间上午 9–11 点（也就是你这边下午到傍晚）。<br>
+  <b>三条禁令：</b>不要把同一篇内容重复发到多个板块；不要发完就消失（每条评论都要回）；不要放「DM 我拿链接」「看我主页」这类话——这是最快的封号方式。
+</div>
+
+<div class="box teal">
+  <h3>被忽略的资产：你在游戏板块是熟面孔</h3>
+  这件事比看起来有用。<b>版主和算法排斥的不是「链接」，是「外来者丢下的链接」。</b>你在一个板块有发言历史，就已经不是外来者——这是大多数发布者花钱都买不到的东西。<br><br>
+  <b>但有一条硬规矩：不能在不相关的板块发不相关的工具。</b>在游戏板块发一个化学配平器，照样按 off-topic 删掉，而且会留下记录。<br><br>
+  <b>正确的用法是让工具本身说得通。</b>首批里的「随机分组 / 抽签器」天然适合：随机分队、随机选人、抽卡模拟——这些都是玩家每天都在做的事。给它加一个「队伍分组 / 抽卡模拟」的模式，它就获得了在游戏圈被分享的合理性。<br><br>
+  更大的机会在于：<b>玩家就是普通人</b>。游戏板块聚集的正是你要服务的那类人，只是他们不会去 r/SideProject。如果将来做一个游戏相关的工具（掉落概率计算、刷取次数规划、升级所需经验估算），那个板块就是你的现成分发渠道，而且你是里面的熟人。<b>这条先记着，不要现在就改定位。</b>
+</div>
+
+<div class="box red">
+  <h3>预期要再降一档：这是诚实的说法</h3>
+  不做持续内容产出，只靠「发布时发一次 Reddit」，那么：<br><br>
+  <b>3 个月内拿到 20 个真实用户，需要至少 2–3 次成功的帖子，不是发一次就行。</b>单次成功帖可能带来几百访客，但之后归零——这是脉冲式流量，不是持续增长。<br><br>
+  所以前 3 个月的合理目标是：<b>验证「有人愿意用」，而不是「拿到 20 个用户」</b>。判据改成：有没有人第二次来、有没有人提反馈、有没有人把它发给别人。真正常态化的用户来源仍然是 SEO，那是 9–18 个月之后的事。<br><br>
+  <b>另一个必须看清的现实：</b>Reddit 带来的人主要是开发者和独立开发者，不是普通人。你的工具做给普通人，但早期访客画像会偏向开发者——这不算失败（开发者会给你 star、会提有用的反馈），但别把它误当成「目标人群验证成功」。
+</div>
+
+<footer>
+  调研时间 2026-09-19。零点击数据来自 SparkToro（2022，65%）与多家 SEO 机构 2025–2026 的追踪（估计已超 70%）；计算器类目热度来自计算器赛道流量分析文章与主流工具站横评。竞品星数来自 GitHub 接口实时查询。
+</footer>
+
+</div>
+</body>
+</html>

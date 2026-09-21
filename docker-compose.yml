@@ -1,0 +1,7 @@
+services:
+  plainkit:
+    build: .
+    image: plainkit
+    ports:
+      - '8080:80'
+    restart: unless-stopped

@@ -1,0 +1,522 @@
+/* ==========================================================================
+   PlainKit 全局样式：重置、排版基线、页面外壳、跨工具共用组件
+   规范来源：specs/DESIGN.md §6 / §6-bis
+   工具私有样式请写在该工具 .astro 文件的 scoped <style> 里，不要加到这里。
+   ========================================================================== */
+
+/* ── 重置 ──────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition: color var(--dur-state) var(--ease-out);
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+code {
+  padding: 1px var(--space-1);
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  overflow-wrap: break-word;
+}
+
+/* 长命令 / 代码片段必须独立成块并允许横向滚动。
+   行内 code 用 overflow-wrap 也会在窄屏被切断（换行点不足时仍会溢出）。 */
+.code-block {
+  display: block;
+  padding: var(--space-3);
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* 唯一的可访问性工具类。除它之外全站禁止工具类。 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 焦点（禁止 outline: none） ────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── 布局容器：全站唯一的列宽 ──────────────────────────────────────────── */
+
+.page,
+.site-header__inner,
+.site-footer__inner {
+  width: 100%;
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding-inline: var(--page-pad);
+}
+
+.page {
+  padding-block: var(--space-7) var(--space-9);
+}
+
+@media (min-width: 640px) {
+  .page,
+  .site-header__inner,
+  .site-footer__inner {
+    padding-inline: var(--page-pad-lg);
+  }
+}
+
+/* ── 站点头部（无边框：工作台是全站唯一带框的区域） ───────────────────── */
+
+.site-header {
+  padding-block: var(--space-5);
+}
+
+.site-header__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-5);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.site-header__wordmark {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tighter);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-header__wordmark:hover {
+  color: var(--ink);
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.site-nav__link {
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+.site-nav__link:hover {
+  color: var(--ink);
+}
+
+.site-nav__link[aria-current='page'] {
+  color: var(--accent);
+}
+
+/* ── 站点页脚 ──────────────────────────────────────────────────────────── */
+
+.site-footer {
+  margin-top: var(--space-9);
+  padding-block: var(--space-5) var(--space-7);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  justify-content: space-between;
+}
+
+.site-footer__link {
+  color: var(--ink-faint);
+}
+
+.site-footer__link:hover {
+  color: var(--ink-muted);
+}
+
+/* ── 工具页结构 ────────────────────────────────────────────────────────── */
+
+.tool__head {
+  margin-bottom: var(--space-6);
+}
+
+.eyebrow {
+  display: block;
+  font-size: var(--text-label);
+  font-weight: 500;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.tool__title {
+  margin-top: var(--space-2);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tighter);
+}
+
+.tool__lead {
+  margin-top: var(--space-3);
+  max-width: var(--measure-text);
+  font-size: var(--text-lg);
+  color: var(--ink-muted);
+}
+
+.tool__notes {
+  margin-top: var(--space-7);
+}
+
+.tool__notes-title {
+  font-size: var(--text-xl);
+  font-weight: 500;
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
+}
+
+.tool__notes-body {
+  margin-top: var(--space-4);
+  max-width: var(--measure-text);
+  color: var(--ink-muted);
+}
+
+.tool__notes-body + .tool__notes-body {
+  margin-top: var(--space-4);
+}
+
+/* 说明区里的后续小节必须与上一段拉开距离，否则标题会紧贴正文 */
+.tool__notes-body + .tool__notes-title {
+  margin-top: var(--space-6);
+}
+
+/* ── 工作台（全站唯一带边框的区域；顶边是刻度规尺） ────────────────────── */
+
+.bench {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  padding: var(--space-5);
+}
+
+.bench__rule {
+  height: var(--rule-height);
+  margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-5);
+  border-top: 1px solid var(--line-strong);
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--line-strong) 0 1px,
+    transparent 1px var(--rule-tick)
+  );
+}
+
+.bench__fields {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 480px) {
+  .bench__fields[data-columns='2'] {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.bench__field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.bench__label {
+  font-size: var(--text-label);
+  font-weight: 500;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.bench__input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color var(--dur-state) var(--ease-out),
+    background-color var(--dur-state) var(--ease-out);
+}
+
+.bench__input:hover {
+  border-color: var(--ink-faint);
+}
+
+.bench__input[aria-invalid='true'] {
+  border-color: var(--danger);
+  background: var(--danger-wash);
+}
+
+.bench__error {
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
+.bench__error:empty {
+  display: none;
+}
+
+/* ── 结果读数（一页只能有一个） ────────────────────────────────────────── */
+
+.readout {
+  display: block;
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+
+.readout[data-state='pending'] {
+  color: var(--ink-muted);
+}
+
+.readout[data-enter='true'] {
+  animation: none;
+  transition:
+    opacity var(--dur-enter) var(--ease-out),
+    transform var(--dur-enter) var(--ease-out);
+}
+
+.readout__label {
+  font-size: var(--text-label);
+  font-weight: 500;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.readout__value {
+  margin-top: var(--space-2);
+  font-size: var(--text-readout);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: var(--tracking-tighter);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.readout[data-state='error'] .readout__value {
+  font-size: var(--text-xl);
+  color: var(--danger);
+}
+
+.readout__note {
+  margin-top: var(--space-1);
+  font-size: var(--text-base);
+  color: var(--ink-muted);
+}
+
+/* ── 操作按钮（一页最多两个，其中必有一个「复制可分享链接」） ───────────── */
+
+.tool__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-state) var(--ease-out),
+    border-color var(--dur-state) var(--ease-out),
+    color var(--dur-state) var(--ease-out);
+}
+
+.btn:hover {
+  border-color: var(--ink-faint);
+}
+
+.btn[data-variant='primary'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn[data-variant='primary']:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── 首屏索引（首页使用；首页是唯一允许用卡片网格的地方） ──────────────── */
+
+.index-title {
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tighter);
+}
+
+.index-intro {
+  margin-top: var(--space-4);
+  max-width: var(--measure-text);
+  font-size: var(--text-lg);
+  color: var(--ink-muted);
+}
+
+.index-empty {
+  margin-top: var(--space-6);
+  max-width: var(--measure-text);
+  color: var(--ink-muted);
+}
+
+.index-list {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding: 0;
+  list-style: none;
+}
+
+.index-card {
+  display: block;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  transition: border-color var(--dur-state) var(--ease-out);
+}
+
+.index-card:hover {
+  border-color: var(--line-strong);
+}
+
+.index-card__title {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.index-card__summary {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+
+/* ── 提示块（用于说明性内容，不是弹窗） ────────────────────────────────── */
+
+.notice {
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.notice[data-tone='warn'] {
+  background: var(--warn-wash);
+  color: var(--warn);
+}
+
+.notice[data-tone='danger'] {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+/* ── 减少动效（全项目唯一允许使用 !important 的地方） ──────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

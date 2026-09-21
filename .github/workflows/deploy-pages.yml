@@ -1,0 +1,54 @@
+name: Deploy to GitHub Pages
+
+# GitHub Pages 镜像。理由不是备份，是信任——在开发者社区里 xxx.github.io 一眼就是开源项目，
+# 而独立域名容易被当成营销站。见 PROJECT-BRIEF.md 第八节。
+#
+# 部署前需要在仓库 Settings → Pages 里把 Source 选为「GitHub Actions」。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # GitHub Pages 部署在 /<仓库名>/ 子路径下，用 BASE_PATH 告诉 Astro。
+      # 同一份代码、两套部署，不改源码。见 specs/技术栈.md §3.1。
+      - run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

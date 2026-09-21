@@ -1,0 +1,95 @@
+/* ==========================================================================
+   PlainKit 设计令牌
+   规范来源：specs/DESIGN.md §6-bis
+   本文件（与 base.css）是全站唯一的全局样式。禁止在别处新增 :root 变量。
+   ========================================================================== */
+
+:root {
+  /* ── 颜色 ──────────────────────────────────────────────────────────────
+     全部颜色必须走 token。任何硬编码颜色都会让将来的暗色模式变成找 bug 项目。
+     新增颜色前必须先在 DESIGN.md §6-bis.2 的表格里登记并标注对比度。 */
+  --bg: #ffffff;
+  --surface: #f6f7f7;
+  --surface-alt: #eff2f1;
+  --line: #e2e5e4;
+  --line-strong: #c8cecc;
+
+  --ink: #16191a; /* 17.6:1 on --bg */
+  --ink-muted: #5a6360; /* 6.1:1 on --bg */
+  --ink-faint: #8b928f; /* 3.2:1 —— 仅限非必要文字，禁止用于正文/标签/结果/按钮 */
+
+  --accent: #0f6e56; /* 6.3:1 on --bg */
+  --accent-hover: #0b5a46; /* 8.4:1 on --bg */
+  --accent-wash: #e6f3ef;
+  --on-accent: #ffffff;
+
+  --warn: #8a530b; /* 6.7:1 on --bg */
+  --warn-wash: #fbf0de;
+  --danger: #a32d2d; /* 7.1:1 on --bg */
+  --danger-wash: #fbebeb;
+
+  --focus: #0f6e56;
+
+  /* ── 排版 ──────────────────────────────────────────────────────────────
+     零 web font。个性来自排版行为，不来自字体文件。 */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --text-label: 12px;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px; /* 输入框不得低于此值，否则 iOS Safari 聚焦时会放大页面 */
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+  --text-readout: clamp(40px, 12vw, 64px);
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.6;
+
+  --tracking-label: 0.08em;
+  --tracking-tight: -0.01em;
+  --tracking-tighter: -0.02em;
+
+  --measure: 680px;
+  --measure-text: 68ch;
+
+  /* ── 间距（4px 基准，只用这套刻度） ────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* ── 圆角 ──────────────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* ── 布局 ──────────────────────────────────────────────────────────── */
+  --page-pad: 20px;
+  --page-pad-lg: 24px;
+
+  /* ── 刻度规尺 ──────────────────────────────────────────────────────── */
+  --rule-tick: 12px;
+  --rule-height: 8px;
+
+  /* ── 动效 ──────────────────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --dur-state: 120ms;
+  --dur-enter: 180ms;
+
+  /* ── 层级（全站只用三档） ──────────────────────────────────────────── */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-overlay: 100;
+}

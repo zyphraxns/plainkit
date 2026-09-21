@@ -1,0 +1,17 @@
+# Cloudflare Pages 自定义响应头。
+#
+# frame-ancestors 与 X-Frame-Options 只能通过 HTTP 头设置，写在 HTML 的 <meta> 里会被忽略，
+# 所以完整的安全头放在这里。GitHub Pages 不支持 _headers，会把它当普通文件忽略——
+# 那边靠 BaseLayout 里的 <meta> CSP 兜底（少了 frame-ancestors，其余一致）。
+#
+# 见 specs/DESIGN.md §16。
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'
+
+# Astro 产出的资源文件名带内容哈希，可以永久缓存。
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
