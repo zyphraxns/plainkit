@@ -10,6 +10,10 @@ dist/
 .env.local
 .env.*.local
 
+# AI 助手的工作记忆与临时数据。这是本地工作状态，不是项目产物，
+# 不应出现在公开仓库里。项目规格在 specs/，过程记录在 docs/。
+.workbuddy/
+
 # 编辑器 / 系统
 .DS_Store
 Thumbs.db
