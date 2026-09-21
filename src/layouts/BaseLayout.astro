@@ -2,6 +2,8 @@
 import '@/styles/tokens.css';
 import '@/styles/base.css';
 
+import { href } from '@/lib/shared/paths';
+
 interface Props {
   /** 页面标题，会拼到「· PlainKit」前。≤ 60 字符 */
   title: string;
@@ -62,20 +64,20 @@ const currentPath = normalizePath(Astro.url.pathname);
     <meta name="referrer" content="no-referrer" />
     {!import.meta.env.DEV && <meta http-equiv="Content-Security-Policy" content={CSP} />}
     {canonical && <link rel="canonical" href={canonical} />}
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href={href('favicon.svg')} type="image/svg+xml" />
   </head>
 
   <body data-tool={tool}>
     <header class="site-header">
       <div class="site-header__inner">
-        <a class="site-header__wordmark" href="/">
+        <a class="site-header__wordmark" href={href('/')}>
           PlainKit
         </a>
         <nav class="site-nav" aria-label="Main">
           {navItems.map((item) => (
             <a
               class="site-nav__link"
-              href={item.href}
+              href={href(item.href)}
               aria-current={currentPath === normalizePath(item.href) ? 'page' : undefined}
             >
               {item.label}
@@ -93,7 +95,7 @@ const currentPath = normalizePath(Astro.url.pathname);
       <div class="site-footer__inner">
         <p>No ads, no tracking, no accounts. Everything is calculated in your browser.</p>
         <p>
-          <a class="site-footer__link" href="/about/">
+          <a class="site-footer__link" href={href('about/')}>
             How this works
           </a>
         </p>

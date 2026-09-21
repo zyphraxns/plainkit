@@ -7,6 +7,8 @@
  * 只登记【已上线】的工具。在建的工具不要写进来，否则会把还没做好的链接
  * 暴露给用户。
  */
+import { href } from './paths';
+
 export interface ToolEntry {
   /** 与 URL 路径、目录名、specs/features/<slug>.md 文件名必须完全一致 */
   slug: string;
@@ -20,7 +22,7 @@ export interface ToolEntry {
 
 export const TOOLS: readonly ToolEntry[] = [];
 
-/** 生成工具页的站内路径（目录式，带尾斜杠）。 */
+/** 生成工具页的站内路径（目录式，带尾斜杠，已带部署基路径）。 */
 export function toolHref(slug: string): string {
-  return `/tools/${slug}/`;
+  return href(`tools/${slug}/`);
 }
