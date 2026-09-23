@@ -219,7 +219,9 @@ export function computeMilestones(startIso: string, today: Date): MilestoneSet {
 
   const items = MILESTONE_TIERS.map((days) => {
     const date = addDays(startIso, days);
-    const daysFromToday = Math.round((localMidnight(date).getTime() - todayMidnight) / MILLISECONDS_PER_DAY);
+    const daysFromToday = Math.round(
+      (localMidnight(date).getTime() - todayMidnight) / MILLISECONDS_PER_DAY,
+    );
     return { days, date, achieved: daysFromToday <= 0, daysFromToday };
   });
 
@@ -256,7 +258,10 @@ export function formatShareText(
   label: string,
   today: Date,
 ): string {
-  const { totalDays, weeks, remainingDays } = computeDuration(localMidnight(startIso), localMidnight(endIso));
+  const { totalDays, weeks, remainingDays } = computeDuration(
+    localMidnight(startIso),
+    localMidnight(endIso),
+  );
   const direction = directionFor(endIso, today);
 
   const core =
