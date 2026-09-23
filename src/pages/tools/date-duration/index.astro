@@ -1,0 +1,634 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { href } from '@/lib/shared/paths';
+
+const pageTitle = 'Date duration calculator';
+const description =
+  'Count the days, weeks and weekdays between two dates, and see your next 1,000-day milestone. Free, no ads, nothing leaves your device.';
+const summary = 'Count the days between two dates — and see the milestones ahead.';
+---
+
+<BaseLayout title={pageTitle} description={description} tool="date-duration">
+  <article class="tool" id="tool" data-mode="edit">
+    <header class="tool__head">
+      <p class="eyebrow">Days</p>
+      <h1 class="tool__title">{pageTitle}</h1>
+      <p class="tool__lead" id="tool-lead">
+        {summary}
+      </p>
+    </header>
+
+    <section class="bench">
+      <div class="bench__rule" aria-hidden="true"></div>
+
+      <div class="bench__fields" id="fields">
+        <div class="bench__field">
+          <label class="bench__label" for="start-date">
+            Start date
+          </label>
+          <input
+            class="bench__input"
+            id="start-date"
+            name="start"
+            type="date"
+            autocomplete="off"
+            aria-describedby="start-date-error"
+          />
+          <p class="bench__error" id="start-date-error"></p>
+        </div>
+
+        <div class="bench__field">
+          <label class="bench__label" for="end-date">
+            End date
+          </label>
+          <input
+            class="bench__input"
+            id="end-date"
+            name="end"
+            type="date"
+            autocomplete="off"
+            aria-describedby="end-date-error end-hint"
+          />
+          <p class="bench__hint" id="end-hint">Defaults to today — change it to count down to a date.</p>
+          <p class="bench__error" id="end-date-error"></p>
+        </div>
+
+        <div class="bench__field">
+          <label class="bench__label" for="label">
+            Label <span class="bench__optional">optional</span>
+          </label>
+          <input
+            class="bench__input"
+            id="label"
+            name="label"
+            type="text"
+            maxlength="60"
+            autocomplete="off"
+            placeholder="e.g. Dating, Graduation"
+            aria-describedby="label-error"
+          />
+          <p class="bench__error" id="label-error"></p>
+        </div>
+      </div>
+
+      <output class="readout" id="readout" data-state="pending" aria-live="polite">
+        <p class="readout__label">Your result</p>
+
+        <div class="result" id="result" hidden>
+          <p class="result__swapped" id="result-swapped" hidden>
+            The end date was before the start date, so the two were swapped.
+          </p>
+          <p class="result__label" id="result-label" hidden></p>
+          <p class="result__value" id="result-value"></p>
+          <p class="result__direction" id="result-direction"></p>
+
+          <dl class="result__grid" id="result-grid">
+            <div class="result__cell">
+              <dt>Weeks</dt>
+              <dd id="stat-weeks"></dd>
+            </div>
+            <div class="result__cell">
+              <dt>Calendar</dt>
+              <dd id="stat-calendar"></dd>
+            </div>
+            <div class="result__cell">
+              <dt>Weekdays</dt>
+              <dd id="stat-weekdays"></dd>
+            </div>
+            <div class="result__cell">
+              <dt>Weekend days</dt>
+              <dd id="stat-weekend"></dd>
+            </div>
+          </dl>
+          <p class="result__footnote">
+            Weekdays are Monday–Friday. Public holidays are not excluded.
+          </p>
+        </div>
+
+        <div class="milestones" id="milestones" hidden>
+          <h2 class="milestones__title">Milestones</h2>
+          <ul class="milestones__list" id="milestone-list"></ul>
+        </div>
+
+        <p class="readout__note" id="readout-note">
+          Pick a start date to see the count.
+        </p>
+      </output>
+
+      <div class="tool__actions" id="editor-actions">
+        <button type="button" class="btn" data-variant="primary" id="copy-result" disabled>
+          Copy result
+        </button>
+      </div>
+
+      <div class="tool__actions" id="view-actions">
+        <a class="btn" data-variant="primary" href={href('tools/date-duration/')}>
+          Make your own
+        </a>
+      </div>
+    </section>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">How this is calculated</h2>
+      <p class="tool__notes-body">
+        The day count compares midnight of the start date with midnight of the end date, in your
+        device's own time zone — so daylight-saving changes never shift the number. The end date
+        defaults to today: pick a past start date to count days since, or set a future end date to
+        count down.
+      </p>
+
+      <h2 class="tool__notes-title">Weekdays</h2>
+      <p class="tool__notes-body">
+        Weekdays count Monday to Friday and include the start date but not the end date. Public
+        holidays are not excluded — holiday calendars differ by country, so subtract the ones that
+        apply to you.
+      </p>
+
+      <h2 class="tool__notes-title">Milestones</h2>
+      <p class="tool__notes-body">
+        When your start date is in the past, the tool looks ahead to round-number days like 100,
+        1,000 and 10,000 — and shows when the next one lands.
+      </p>
+
+      <h2 class="tool__notes-title">Sharing</h2>
+      <p class="tool__notes-body">
+        Copy result puts a ready-to-send sentence on your clipboard. The address bar always holds a
+        link to this exact result — send it and the count updates itself on the other side.
+      </p>
+
+      <h2 class="tool__notes-title">Private by default</h2>
+      <p class="tool__notes-body">
+        Everything is calculated on your device. Nothing you type is sent anywhere — there is no
+        server to send it to.
+      </p>
+    </section>
+  </article>
+</BaseLayout>
+
+<script>
+  import {
+    computeDuration,
+    computeMilestones,
+    decodeState,
+    directionFor,
+    encodeState,
+    formatDate,
+    formatNumber,
+    formatShareText,
+    localMidnight,
+    parseDate,
+  } from '@/lib/tools/date-duration';
+  import type { DateDurationState, Milestone } from '@/lib/tools/date-duration';
+
+  const WEEKDAYS = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ] as const;
+
+  /** 今天的本地日期，YYYY-MM-DD（终点默认值）。 */
+  function todayIso(now: Date): string {
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${now.getFullYear()}-${month}-${day}`;
+  }
+
+  /** "2 years, 8 months, 27 days" —— 跳过零段；全零时显示 "0 days"。 */
+  function formatCalendar(calendar: { years: number; months: number; days: number }): string {
+    const parts: string[] = [];
+    if (calendar.years > 0) parts.push(`${calendar.years} ${calendar.years === 1 ? 'year' : 'years'}`);
+    if (calendar.months > 0) parts.push(`${calendar.months} ${calendar.months === 1 ? 'month' : 'months'}`);
+    if (calendar.days > 0) parts.push(`${calendar.days} ${calendar.days === 1 ? 'day' : 'days'}`);
+    return parts.length > 0 ? parts.join(', ') : '0 days';
+  }
+
+  /**
+   * 页面初始化。
+   *
+   * DOM 引用在守卫之后收进字段对象（strictest 下窄化不进闭包，直接引用
+   * querySelector 返回值会整片报 possibly-null）。
+   * 任何元素缺失时抛错，由顶层保护接住，页面保持可读（DESIGN.md §9.3）。
+   */
+  function init(): void {
+    const tool = document.querySelector('#tool');
+    const lead = document.querySelector('#tool-lead');
+    const startInput = document.querySelector('#start-date');
+    const endInput = document.querySelector('#end-date');
+    const labelInput = document.querySelector('#label');
+    const readout = document.querySelector('#readout');
+    const result = document.querySelector('#result');
+    const resultSwapped = document.querySelector('#result-swapped');
+    const resultLabel = document.querySelector('#result-label');
+    const resultValue = document.querySelector('#result-value');
+    const resultDirection = document.querySelector('#result-direction');
+    const statWeeks = document.querySelector('#stat-weeks');
+    const statCalendar = document.querySelector('#stat-calendar');
+    const statWeekdays = document.querySelector('#stat-weekdays');
+    const statWeekend = document.querySelector('#stat-weekend');
+    const milestones = document.querySelector('#milestones');
+    const milestoneList = document.querySelector('#milestone-list');
+    const readoutNote = document.querySelector('#readout-note');
+    const copyButton = document.querySelector('#copy-result');
+
+    if (
+      !(tool instanceof HTMLElement) ||
+      !(lead instanceof HTMLElement) ||
+      !(startInput instanceof HTMLInputElement) ||
+      !(endInput instanceof HTMLInputElement) ||
+      !(labelInput instanceof HTMLInputElement) ||
+      !(readout instanceof HTMLElement) ||
+      !(result instanceof HTMLElement) ||
+      !(resultSwapped instanceof HTMLElement) ||
+      !(resultLabel instanceof HTMLElement) ||
+      !(resultValue instanceof HTMLElement) ||
+      !(resultDirection instanceof HTMLElement) ||
+      !(statWeeks instanceof HTMLElement) ||
+      !(statCalendar instanceof HTMLElement) ||
+      !(statWeekdays instanceof HTMLElement) ||
+      !(statWeekend instanceof HTMLElement) ||
+      !(milestones instanceof HTMLElement) ||
+      !(milestoneList instanceof HTMLElement) ||
+      !(readoutNote instanceof HTMLElement) ||
+      !(copyButton instanceof HTMLButtonElement)
+    ) {
+      throw new Error('date-duration: required elements not found');
+    }
+
+    // 字段对象在守卫【之后】创建，属性类型已定型；嵌套函数里引用属性，
+    // 不依赖跨闭包的类型窄化（grade-calculator 教训）
+    const inputs = { start: startInput, end: endInput, label: labelInput };
+    const view = {
+      tool,
+      lead,
+      readout,
+      result,
+      resultSwapped,
+      resultLabel,
+      resultValue,
+      resultDirection,
+      statWeeks,
+      statCalendar,
+      statWeekdays,
+      statWeekend,
+      milestones,
+      milestoneList,
+      readoutNote,
+      copyButton,
+    };
+
+    /** 用户是否已经动过任何字段——初始空状态不显示错误。 */
+    let touched = false;
+    /** 最近一次全部有效的输入（已规范化），供 Copy 使用；无效时为 null。 */
+    let lastState: DateDurationState | null = null;
+
+    function setError(input: HTMLInputElement, errorId: string, message: string): void {
+      const errorEl = document.querySelector(`#${errorId}`);
+      if (!(errorEl instanceof HTMLElement)) return;
+      errorEl.textContent = message;
+      if (message === '') {
+        input.removeAttribute('aria-invalid');
+      } else {
+        input.setAttribute('aria-invalid', 'true');
+      }
+    }
+
+    function renderPending(): void {
+      view.readout.dataset.state = 'pending';
+      view.result.hidden = true;
+      view.milestones.hidden = true;
+      view.readoutNote.hidden = false;
+      view.readoutNote.textContent = 'Pick a start date to see the count.';
+      view.copyButton.disabled = true;
+    }
+
+    function renderMilestoneItem(milestone: Milestone, isNext: boolean): HTMLLIElement {
+      const item = document.createElement('li');
+      item.className = 'milestones__item';
+      if (isNext) item.classList.add('milestones__item--next');
+
+      const title = document.createElement('span');
+      title.className = 'milestones__days';
+      title.textContent = `${formatNumber(milestone.days)} days`;
+
+      const detail = document.createElement('span');
+      detail.className = 'milestones__detail';
+      const weekday = WEEKDAYS[localMidnight(milestone.date).getDay()];
+      detail.textContent =
+        milestone.achieved
+          ? `${formatDate(milestone.date)} (${weekday}) — passed`
+          : `${formatDate(milestone.date)} (${weekday}) — in ${formatNumber(milestone.daysFromToday)} days`;
+      if (isNext) detail.classList.add('milestones__detail--next');
+
+      item.append(title, detail);
+      return item;
+    }
+
+    /** 重新校验并渲染结果。输入变化即调用；URL 同步也在这里完成。 */
+    function render(): void {
+      lastState = null;
+
+      const label = inputs.label.value.trim().slice(0, 60);
+      const start = parseDate(inputs.start.value, 'start');
+      const end = parseDate(inputs.end.value, 'end');
+
+      setError(inputs.start, 'start-date-error', touched && !start.ok ? start.message : '');
+      setError(inputs.end, 'end-date-error', touched && !end.ok ? end.message : '');
+
+      if (!start.ok || !end.ok) {
+        renderPending();
+        syncUrl(null);
+        return;
+      }
+
+      // 全部有效；记下可分享状态（日期按交换后的规范化顺序）
+      const duration = computeDuration(localMidnight(start.value), localMidnight(end.value));
+      const normalizedStart = duration.swapped ? end.value : start.value;
+      const normalizedEnd = duration.swapped ? start.value : end.value;
+      const state: DateDurationState = {
+        start: normalizedStart,
+        end: normalizedEnd,
+        label,
+      };
+      lastState = state;
+      syncUrl(state);
+
+      const now = new Date();
+      const direction = directionFor(normalizedEnd, now);
+
+      view.resultSwapped.hidden = !duration.swapped;
+      if (label === '') {
+        view.resultLabel.hidden = true;
+      } else {
+        view.resultLabel.hidden = false;
+        view.resultLabel.textContent = label;
+      }
+      view.resultValue.textContent = formatNumber(duration.totalDays);
+      view.resultDirection.textContent =
+        direction === 'since'
+          ? `days since ${formatDate(normalizedStart)}`
+          : `days until ${formatDate(normalizedEnd)}`;
+
+      view.statWeeks.textContent = `${formatNumber(duration.weeks)} w ${duration.remainingDays} d`;
+      view.statCalendar.textContent = formatCalendar(duration.calendar);
+      view.statWeekdays.textContent = formatNumber(duration.weekdays);
+      view.statWeekend.textContent = formatNumber(duration.weekendDays);
+
+      // 里程碑区只在起点严格在过去时渲染（需求 §4.2）
+      view.milestoneList.replaceChildren();
+      const startIsPast = localMidnight(normalizedStart).getTime() < localMidnight(todayIso(now)).getTime();
+      if (startIsPast) {
+        const set = computeMilestones(normalizedStart, now);
+        for (const milestone of set.items) {
+          view.milestoneList.append(renderMilestoneItem(milestone, set.next !== null && set.next.days === milestone.days));
+        }
+        view.milestones.hidden = false;
+      } else {
+        view.milestones.hidden = true;
+      }
+
+      view.readout.dataset.state = 'ok';
+      view.result.hidden = false;
+      view.readoutNote.hidden = true;
+      view.copyButton.disabled = false;
+    }
+
+    /** 把当前状态同步进地址栏；无效时清掉参数。 */
+    function syncUrl(state: DateDurationState | null): void {
+      const url = new URL(window.location.href);
+      url.search = state ? encodeState(state).toString() : '';
+      window.history.replaceState(null, '', url);
+    }
+
+    for (const input of [inputs.start, inputs.end, inputs.label]) {
+      input.addEventListener('input', () => {
+        touched = true;
+        render();
+      });
+    }
+
+    // ── Copy result（AC-008）──────────────────────────────────────────
+    let copyResetTimer = 0;
+    function resetCopyLabelLater(): void {
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        view.copyButton.textContent = 'Copy result';
+      }, 2000);
+    }
+
+    view.copyButton.addEventListener('click', () => {
+      if (!lastState) return;
+      const { start, end, label } = lastState;
+      const text = formatShareText(start, end, label, new Date());
+
+      const write = navigator.clipboard?.writeText(text);
+      if (!write) {
+        view.copyButton.textContent = 'Copying is not available in this browser';
+        resetCopyLabelLater();
+        return;
+      }
+
+      write
+        .then(() => {
+          view.copyButton.textContent = 'Copied';
+        })
+        .catch(() => {
+          view.copyButton.textContent = 'Copying was blocked — select the text instead';
+        })
+        .finally(resetCopyLabelLater);
+    });
+
+    // ── 分享链接：合法参数 → 观览模式（AC-007 / AC-015）─────────────────
+    const decoded = decodeState(new URLSearchParams(window.location.search));
+    if (decoded) {
+      inputs.start.value = decoded.start;
+      inputs.end.value = decoded.end;
+      inputs.label.value = decoded.label;
+      touched = true;
+      view.tool.dataset.mode = 'view';
+      view.lead.textContent = 'A shared day count, updated to today on your device.';
+    } else {
+      // 空态：终点默认今天（AC-001）
+      inputs.end.value = todayIso(new Date());
+    }
+
+    render();
+  }
+
+  // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
+  try {
+    init();
+  } catch {
+    // 页面无 JS 时本来就完整可读（渐进增强），这里保持静默
+  }
+</script>
+
+<style>
+  .bench__hint {
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+  }
+
+  .bench__optional {
+    color: var(--ink-faint);
+    font-weight: 400;
+  }
+
+  /* 结果区：大数字 + 方向短语 + 次级分解网格 */
+  .result {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    align-items: center;
+    text-align: center;
+  }
+
+  .result__swapped {
+    font-size: var(--text-sm);
+    color: var(--warn);
+  }
+
+  .result__label {
+    font-size: var(--text-xl);
+    font-weight: 500;
+    letter-spacing: var(--tracking-tight);
+    color: var(--ink-muted);
+  }
+
+  .result__value {
+    font-size: clamp(48px, 14vw, 96px);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: var(--tracking-tighter);
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+
+  .result__direction {
+    font-size: var(--text-base);
+    color: var(--ink-muted);
+  }
+
+  .result__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-2);
+    width: 100%;
+    max-width: 420px;
+    margin: 0;
+  }
+
+  .result__cell {
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    text-align: left;
+  }
+
+  .result__cell dt {
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+  }
+
+  .result__cell dd {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .result__footnote {
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+  }
+
+  /* 里程碑列表：下一个未到的档位高亮 */
+  .milestones {
+    width: 100%;
+    max-width: 420px;
+    margin-inline: auto;
+    text-align: left;
+  }
+
+  .milestones__title {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--ink-muted);
+    margin-bottom: var(--space-2);
+  }
+
+</style>
+
+<!--
+  里程碑列表项由 JS 运行时创建（renderMilestoneItem），Astro 的 scoped
+  style 只作用于模板里的静态元素，所以这一段必须 is:global。
+-->
+<style is:global>
+  .milestones__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .milestones__item {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      border-top: 1px solid var(--line);
+      font-size: var(--text-sm);
+    }
+
+    .milestones__item:last-child {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .milestones__days {
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    .milestones__detail {
+      color: var(--ink-faint);
+      text-align: right;
+    }
+
+    /* deviation: 下一个里程碑的强调色用 accent-wash 背景，克制高亮（DESIGN §6） */
+    .milestones__item--next {
+      background: var(--accent-wash);
+      border-radius: var(--radius-sm);
+      border-top-color: transparent;
+    }
+
+    .milestones__item--next + .milestones__item {
+      border-top-color: transparent;
+    }
+
+    .milestones__detail--next {
+      color: var(--accent);
+      font-weight: 500;
+    }
+</style>
+
+<style>
+  /* 观览模式：隐藏编辑元素，只留结果与 Make your own（AC-007） */
+  .tool[data-mode='view'] .bench__fields,
+  .tool[data-mode='view'] #editor-actions,
+  .tool[data-mode='view'] .tool__notes {
+    display: none;
+  }
+
+  #view-actions {
+    display: none;
+  }
+
+  .tool[data-mode='view'] #view-actions {
+    display: flex;
+  }
+</style>

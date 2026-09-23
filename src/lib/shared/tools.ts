@@ -33,6 +33,12 @@ export const TOOLS: readonly ToolEntry[] = [
     summary: 'Turn a date into a shareable countdown or anniversary card.',
     category: 'Life',
   },
+  {
+    slug: 'date-duration',
+    title: 'Date duration calculator',
+    summary: 'Count days, weeks and weekdays between two dates, with milestone reminders.',
+    category: 'Life',
+  },
 ];
 
 /** 生成工具页的站内路径（目录式，带尾斜杠，已带部署基路径）。 */
