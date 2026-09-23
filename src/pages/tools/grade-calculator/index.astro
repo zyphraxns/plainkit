@@ -1,0 +1,324 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const pageTitle = 'Final grade calculator';
+const description =
+  'Find out what score you need on the final exam to reach your target grade. Free, no ads, nothing leaves your device.';
+const summary = 'What you need on the final to hit your target grade.';
+---
+
+<BaseLayout title={pageTitle} description={description} tool="grade-calculator">
+  <article class="tool">
+    <header class="tool__head">
+      <p class="eyebrow">Grades</p>
+      <h1 class="tool__title">{pageTitle}</h1>
+      <p class="tool__lead">{summary}</p>
+    </header>
+
+    <section class="bench">
+      <div class="bench__rule" aria-hidden="true"></div>
+
+      <div class="bench__fields">
+        <div class="bench__field">
+          <label class="bench__label" for="current-grade">
+            Current grade
+          </label>
+          <input
+            class="bench__input"
+            id="current-grade"
+            name="currentGrade"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            placeholder="e.g. 75"
+            aria-describedby="current-grade-error"
+          />
+          <p class="bench__error" id="current-grade-error"></p>
+        </div>
+
+        <div class="bench__field">
+          <label class="bench__label" for="final-weight">
+            Final exam weight
+          </label>
+          <input
+            class="bench__input"
+            id="final-weight"
+            name="finalWeight"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            placeholder="e.g. 40"
+            aria-describedby="final-weight-error"
+          />
+          <p class="bench__error" id="final-weight-error"></p>
+        </div>
+
+        <div class="bench__field">
+          <label class="bench__label" for="target-grade">
+            Target grade
+          </label>
+          <input
+            class="bench__input"
+            id="target-grade"
+            name="targetGrade"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            placeholder="e.g. 80"
+            aria-describedby="target-grade-error"
+          />
+          <p class="bench__error" id="target-grade-error"></p>
+        </div>
+      </div>
+
+      <output class="readout" id="readout" data-state="pending" aria-live="polite">
+        <p class="readout__label" id="readout-label">
+          Your result
+        </p>
+        <p class="readout__value" id="readout-value" hidden></p>
+        <p class="readout__note" id="readout-note">
+          Enter your grades to see what you need on the final.
+        </p>
+      </output>
+
+      <div class="tool__actions">
+        <button type="button" class="btn" data-variant="primary" id="copy-link" disabled>
+          Copy link
+        </button>
+      </div>
+    </section>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">How this is calculated</h2>
+      <p class="tool__notes-body">
+        Your current grade covers everything except the final exam. It counts for its share of the
+        overall grade, and the final covers the rest:
+      </p>
+      <p class="tool__notes-body">
+        <code>required = (target − current × (100 − weight) / 100) / (weight / 100)</code>
+      </p>
+      <p class="tool__notes-body">
+        The result is shown to one decimal place. If your target is mathematically out of reach, you
+        will see the best overall grade you can still achieve. If your target is already locked in,
+        you will see that too.
+      </p>
+
+      <h2 class="tool__notes-title">What this assumes</h2>
+      <p class="tool__notes-body">
+        Everything except the final exam has already been graded, and the final is the only
+        remaining assessment. Grades are percentages from 0 to 100, and the final must be worth at
+        least 1 percent.
+      </p>
+
+      <h2 class="tool__notes-title">Private by default</h2>
+      <p class="tool__notes-body">
+        Everything is calculated on your device. Nothing you type is sent anywhere — there is no
+        server to send it to.
+      </p>
+    </section>
+  </article>
+</BaseLayout>
+
+<script>
+  import { formatScore } from '@/lib/shared/format';
+  import {
+    computeRequiredFinal,
+    decodeState,
+    encodeState,
+    parseCurrentGrade,
+    parseFinalWeight,
+    parseTargetGrade,
+  } from '@/lib/tools/grade-calculator';
+  import type { GradeState } from '@/lib/tools/grade-calculator';
+
+  /** 用户是否已经动过任何字段——初始空状态不显示错误（AC-001）。 */
+  let touched = false;
+  /** 最近一次全部有效的输入，供 Copy link 使用；无效时为 null。 */
+  let lastState: GradeState | null = null;
+
+  /**
+   * 页面初始化。
+   *
+   * 全部 DOM 引用在守卫之后收进 view / fields 两个别名对象——闭包里只用别名，
+   * 不依赖跨闭包的类型窄化（strictest 下窄化不进闭包，直接引用 querySelector
+   * 的返回值会整片报 possibly-null）。
+   * 任何元素缺失时抛错，由底部的顶层保护接住，页面保持可读（DESIGN.md §9.3）。
+   */
+  function init(): void {
+    const currentInput = document.querySelector('#current-grade');
+    const weightInput = document.querySelector('#final-weight');
+    const targetInput = document.querySelector('#target-grade');
+    const readout = document.querySelector('#readout');
+    const readoutLabel = document.querySelector('#readout-label');
+    const readoutValue = document.querySelector('#readout-value');
+    const readoutNote = document.querySelector('#readout-note');
+    const copyButton = document.querySelector('#copy-link');
+
+    if (
+      !(currentInput instanceof HTMLInputElement) ||
+      !(weightInput instanceof HTMLInputElement) ||
+      !(targetInput instanceof HTMLInputElement) ||
+      !(readout instanceof HTMLElement) ||
+      !(readoutLabel instanceof HTMLElement) ||
+      !(readoutValue instanceof HTMLElement) ||
+      !(readoutNote instanceof HTMLElement) ||
+      !(copyButton instanceof HTMLButtonElement)
+    ) {
+      throw new Error('grade-calculator: required elements not found');
+    }
+
+    // 字段对象在守卫【之后】创建，属性类型已定型；嵌套函数里引用属性，
+    // 不依赖跨闭包的类型窄化（strictest 下窄化不进闭包）
+    const currentField = { input: currentInput, errorId: 'current-grade-error' };
+    const weightField = { input: weightInput, errorId: 'final-weight-error' };
+    const targetField = { input: targetInput, errorId: 'target-grade-error' };
+    const allFields = [currentField, weightField, targetField];
+    const view = { readout, readoutLabel, readoutValue, readoutNote, copyButton };
+
+    function setError(input: HTMLInputElement, errorId: string, message: string): void {
+      const errorEl = document.querySelector(`#${errorId}`);
+      if (!(errorEl instanceof HTMLElement)) return;
+      errorEl.textContent = message;
+      if (message === '') {
+        input.removeAttribute('aria-invalid');
+      } else {
+        input.setAttribute('aria-invalid', 'true');
+      }
+    }
+
+    function renderPending(): void {
+      view.readout.dataset.state = 'pending';
+      view.readoutLabel.textContent = 'Your result';
+      view.readoutValue.hidden = true;
+      view.readoutValue.textContent = '';
+      view.readoutNote.textContent = 'Enter your grades to see what you need on the final.';
+      view.copyButton.disabled = true;
+    }
+
+    function renderReadout(state: 'ok' | 'warn', label: string, value: string, note: string): void {
+      view.readout.dataset.state = state;
+      view.readoutLabel.textContent = label;
+      view.readoutValue.textContent = value;
+      view.readoutValue.hidden = false;
+      view.readoutNote.textContent = note;
+      view.copyButton.disabled = false;
+    }
+
+    /** 重新校验并渲染读数。输入变化即调用（AC-003），错误永远反映当前值（AC-012）。 */
+    function render(): void {
+      lastState = null;
+
+      const current = parseCurrentGrade(currentField.input.value);
+      const weight = parseFinalWeight(weightField.input.value);
+      const target = parseTargetGrade(targetField.input.value);
+
+      setError(
+        currentField.input,
+        currentField.errorId,
+        touched && !current.ok ? current.message : '',
+      );
+      setError(weightField.input, weightField.errorId, touched && !weight.ok ? weight.message : '');
+      setError(targetField.input, targetField.errorId, touched && !target.ok ? target.message : '');
+
+      if (!current.ok || !weight.ok || !target.ok) {
+        renderPending();
+        return;
+      }
+
+      // 此处三个值都已窄化为 ok: true；可分享状态在展示判定之前记录
+      lastState = {
+        currentGrade: current.value,
+        finalWeight: weight.value,
+        targetGrade: target.value,
+      };
+
+      const requirement = computeRequiredFinal(current.value, weight.value, target.value);
+      if (requirement.status === 'reachable') {
+        renderReadout(
+          'ok',
+          'You need on the final',
+          formatScore(requirement.required),
+          `to reach an overall grade of ${formatScore(target.value)}.`,
+        );
+      } else if (requirement.status === 'unreachable') {
+        renderReadout(
+          'warn',
+          'Not reachable',
+          formatScore(requirement.bestPossible),
+          'is your best possible overall grade, even with a perfect 100 on the final.',
+        );
+      } else {
+        renderReadout(
+          'ok',
+          'Already secured',
+          formatScore(0),
+          `Even a 0 on the final keeps you at ${formatScore(target.value)} or above.`,
+        );
+      }
+    }
+
+    // ── 事件绑定：输入变化即重算（AC-003），错误即时反映当前值（AC-012）──
+    for (const field of allFields) {
+      field.input.addEventListener('input', () => {
+        touched = true;
+        render();
+      });
+    }
+
+    // ── Copy link（AC-004）────────────────────────────────────────────
+    let copyResetTimer = 0;
+    function resetCopyLabelLater(): void {
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        view.copyButton.textContent = 'Copy link';
+      }, 2000);
+    }
+
+    view.copyButton.addEventListener('click', () => {
+      if (!lastState) return;
+      const url = new URL(window.location.href);
+      url.search = encodeState(lastState);
+
+      const write = navigator.clipboard?.writeText(url.href);
+      if (!write) {
+        view.copyButton.textContent = 'Copying is not available in this browser';
+        resetCopyLabelLater();
+        return;
+      }
+
+      write
+        .then(() => {
+          view.copyButton.textContent = 'Link copied';
+        })
+        .catch(() => {
+          view.copyButton.textContent = 'Copying was blocked — copy the address bar link instead';
+        })
+        .finally(resetCopyLabelLater);
+    });
+
+    // ── 分享链接预填（AC-005 / AC-011）：与手输走同一条校验路径 ──────────
+    const decoded = decodeState(window.location.search);
+    const hasAny = Object.values(decoded).some((value) => value !== '');
+    if (hasAny) {
+      currentInput.value = decoded.currentGrade;
+      weightInput.value = decoded.finalWeight;
+      targetInput.value = decoded.targetGrade;
+      touched = true;
+      render();
+    }
+  }
+
+  // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
+  try {
+    init();
+  } catch {
+    // 页面无 JS 时本来就完整可读（AC-015），这里保持静默
+  }
+</script>
+
+<style>
+  /* 不可达是「目标不现实」，不是输入错误——用警告色而非错误色 */
+  .readout[data-state='warn'] .readout__value {
+    color: var(--warn);
+  }
+</style>

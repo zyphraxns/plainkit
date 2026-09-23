@@ -20,7 +20,14 @@ export interface ToolEntry {
   category: string;
 }
 
-export const TOOLS: readonly ToolEntry[] = [];
+export const TOOLS: readonly ToolEntry[] = [
+  {
+    slug: 'grade-calculator',
+    title: 'Final grade calculator',
+    summary: 'See what score you need on the final to reach your target grade.',
+    category: 'Study',
+  },
+];
 
 /** 生成工具页的站内路径（目录式，带尾斜杠，已带部署基路径）。 */
 export function toolHref(slug: string): string {
