@@ -30,6 +30,15 @@
 
   --focus: #0f6e56;
 
+  /* ── 卡片主题色（countdown-card 分享产物；canvas-card 内核使用同值） ──
+     2026-09-23 用户批准。light 主题完全复用上面的现有令牌；
+     warm 主题的底色/次级色/主色复用 --warn-wash / --warn。 */
+  --card-midnight-bg: #101614;
+  --card-midnight-ink: #f2f5f4; /* 15.5:1 on --card-midnight-bg */
+  --card-midnight-muted: #93a39d; /* 7.2:1 on --card-midnight-bg */
+  --card-midnight-accent: #7ed9b8; /* 9.8:1 on --card-midnight-bg */
+  --card-warm-ink: #3a2c1b; /* 10.9:1 on --warn-wash */
+
   /* ── 排版 ──────────────────────────────────────────────────────────────
      零 web font。个性来自排版行为，不来自字体文件。 */
   --font-sans:
