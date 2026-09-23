@@ -213,22 +213,20 @@ describe('formatShareText', () => {
   it('AC-009: builds a neutral sentence with the site mark for a past span', () => {
     const text = formatShareText('2023-12-27', '2026-09-23', '', today);
     expect(text).toBe(
-      '1,001 days since December 27, 2023 — that\'s 143 weeks and 0 days. plainkit.app',
+      "1,001 days since December 27, 2023 — that's 143 weeks and 0 days. plainkit.app",
     );
   });
 
   it('AC-008: prefixes the label when one is set', () => {
     const text = formatShareText('2023-12-27', '2026-09-23', 'Dating', today);
     expect(text).toBe(
-      'Dating: 1,001 days since December 27, 2023 — that\'s 143 weeks and 0 days. plainkit.app',
+      "Dating: 1,001 days since December 27, 2023 — that's 143 weeks and 0 days. plainkit.app",
     );
   });
 
   it('AC-003: uses "until" wording when the end date is in the future', () => {
     const text = formatShareText('2026-09-23', '2027-06-15', '', today);
-    expect(text).toBe(
-      '265 days until June 15, 2027 — that\'s 37 weeks and 6 days. plainkit.app',
-    );
+    expect(text).toBe("265 days until June 15, 2027 — that's 37 weeks and 6 days. plainkit.app");
   });
 
   it('AC-009: drops the weeks clause for spans shorter than a week and pluralizes correctly', () => {

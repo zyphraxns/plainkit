@@ -49,7 +49,9 @@ const summary = 'Count the days between two dates — and see the milestones ahe
             autocomplete="off"
             aria-describedby="end-date-error end-hint"
           />
-          <p class="bench__hint" id="end-hint">Defaults to today — change it to count down to a date.</p>
+          <p class="bench__hint" id="end-hint">
+            Defaults to today — change it to count down to a date.
+          </p>
           <p class="bench__error" id="end-date-error"></p>
         </div>
 
@@ -200,8 +202,10 @@ const summary = 'Count the days between two dates — and see the milestones ahe
   /** "2 years, 8 months, 27 days" —— 跳过零段；全零时显示 "0 days"。 */
   function formatCalendar(calendar: { years: number; months: number; days: number }): string {
     const parts: string[] = [];
-    if (calendar.years > 0) parts.push(`${calendar.years} ${calendar.years === 1 ? 'year' : 'years'}`);
-    if (calendar.months > 0) parts.push(`${calendar.months} ${calendar.months === 1 ? 'month' : 'months'}`);
+    if (calendar.years > 0)
+      parts.push(`${calendar.years} ${calendar.years === 1 ? 'year' : 'years'}`);
+    if (calendar.months > 0)
+      parts.push(`${calendar.months} ${calendar.months === 1 ? 'month' : 'months'}`);
     if (calendar.days > 0) parts.push(`${calendar.days} ${calendar.days === 1 ? 'day' : 'days'}`);
     return parts.length > 0 ? parts.join(', ') : '0 days';
   }
@@ -317,10 +321,9 @@ const summary = 'Count the days between two dates — and see the milestones ahe
       const detail = document.createElement('span');
       detail.className = 'milestones__detail';
       const weekday = WEEKDAYS[localMidnight(milestone.date).getDay()];
-      detail.textContent =
-        milestone.achieved
-          ? `${formatDate(milestone.date)} (${weekday}) — passed`
-          : `${formatDate(milestone.date)} (${weekday}) — in ${formatNumber(milestone.daysFromToday)} days`;
+      detail.textContent = milestone.achieved
+        ? `${formatDate(milestone.date)} (${weekday}) — passed`
+        : `${formatDate(milestone.date)} (${weekday}) — in ${formatNumber(milestone.daysFromToday)} days`;
       if (isNext) detail.classList.add('milestones__detail--next');
 
       item.append(title, detail);
@@ -379,11 +382,14 @@ const summary = 'Count the days between two dates — and see the milestones ahe
 
       // 里程碑区只在起点严格在过去时渲染（需求 §4.2）
       view.milestoneList.replaceChildren();
-      const startIsPast = localMidnight(normalizedStart).getTime() < localMidnight(todayIso(now)).getTime();
+      const startIsPast =
+        localMidnight(normalizedStart).getTime() < localMidnight(todayIso(now)).getTime();
       if (startIsPast) {
         const set = computeMilestones(normalizedStart, now);
         for (const milestone of set.items) {
-          view.milestoneList.append(renderMilestoneItem(milestone, set.next !== null && set.next.days === milestone.days));
+          view.milestoneList.append(
+            renderMilestoneItem(milestone, set.next !== null && set.next.days === milestone.days),
+          );
         }
         view.milestones.hidden = false;
       } else {
@@ -560,7 +566,6 @@ const summary = 'Count the days between two dates — and see the milestones ahe
     color: var(--ink-muted);
     margin-bottom: var(--space-2);
   }
-
 </style>
 
 <!--
@@ -569,51 +574,51 @@ const summary = 'Count the days between two dates — and see the milestones ahe
 -->
 <style is:global>
   .milestones__list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-    }
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
 
-    .milestones__item {
-      display: flex;
-      justify-content: space-between;
-      gap: var(--space-3);
-      padding: var(--space-2) var(--space-3);
-      border-top: 1px solid var(--line);
-      font-size: var(--text-sm);
-    }
+  .milestones__item {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-top: 1px solid var(--line);
+    font-size: var(--text-sm);
+  }
 
-    .milestones__item:last-child {
-      border-bottom: 1px solid var(--line);
-    }
+  .milestones__item:last-child {
+    border-bottom: 1px solid var(--line);
+  }
 
-    .milestones__days {
-      font-variant-numeric: tabular-nums;
-      font-weight: 500;
-    }
+  .milestones__days {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
 
-    .milestones__detail {
-      color: var(--ink-faint);
-      text-align: right;
-    }
+  .milestones__detail {
+    color: var(--ink-faint);
+    text-align: right;
+  }
 
-    /* deviation: 下一个里程碑的强调色用 accent-wash 背景，克制高亮（DESIGN §6） */
-    .milestones__item--next {
-      background: var(--accent-wash);
-      border-radius: var(--radius-sm);
-      border-top-color: transparent;
-    }
+  /* deviation: 下一个里程碑的强调色用 accent-wash 背景，克制高亮（DESIGN §6） */
+  .milestones__item--next {
+    background: var(--accent-wash);
+    border-radius: var(--radius-sm);
+    border-top-color: transparent;
+  }
 
-    .milestones__item--next + .milestones__item {
-      border-top-color: transparent;
-    }
+  .milestones__item--next + .milestones__item {
+    border-top-color: transparent;
+  }
 
-    .milestones__detail--next {
-      color: var(--accent);
-      font-weight: 500;
-    }
+  .milestones__detail--next {
+    color: var(--accent);
+    font-weight: 500;
+  }
 </style>
 
 <style>
