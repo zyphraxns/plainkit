@@ -661,6 +661,11 @@ import { href } from '@/lib/shared/paths';
 | `--danger` | `#A32D2D` | 错误文字、无效输入边框 | 7.1:1 ✅ |
 | `--danger-wash` | `#FBEBEB` | 错误区底色 | — |
 | `--focus` | `#0F6E56` | 焦点环（与 accent 同值） | 6.3:1 ✅ |
+| `--card-midnight-bg` | `#101614` | 卡片 midnight 主题底色（分享产物专用） | — |
+| `--card-midnight-ink` | `#F2F5F4` | 卡片 midnight 主题正文 | 15.5:1（对 midnight-bg）✅ |
+| `--card-midnight-muted` | `#93A39D` | 卡片 midnight 主题次级文字 | 7.2:1（对 midnight-bg）✅ |
+| `--card-midnight-accent` | `#7ED9B8` | 卡片 midnight 主题读数 | 9.8:1（对 midnight-bg）✅ |
+| `--card-warm-ink` | `#3A2C1B` | 卡片 warm 主题正文（底色复用 `--warn-wash`） | 10.9:1（对 warn-wash）✅ |
 
 **硬性规则**：
 

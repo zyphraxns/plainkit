@@ -27,6 +27,12 @@ export const TOOLS: readonly ToolEntry[] = [
     summary: 'See what score you need on the final to reach your target grade.',
     category: 'Study',
   },
+  {
+    slug: 'countdown-card',
+    title: 'Countdown card',
+    summary: 'Turn a date into a shareable countdown or anniversary card.',
+    category: 'Life',
+  },
 ];
 
 /** 生成工具页的站内路径（目录式，带尾斜杠，已带部署基路径）。 */

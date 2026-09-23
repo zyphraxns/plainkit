@@ -1,0 +1,575 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { href } from '@/lib/shared/paths';
+
+const pageTitle = 'Countdown card';
+const description =
+  'Turn any date into a beautiful countdown or anniversary card. Download it as an image or share a link. Free, no ads, nothing leaves your device.';
+const summary = 'Count the days to (or since) a date that matters, as a card worth sharing.';
+---
+
+<BaseLayout title={pageTitle} description={description} tool="countdown-card">
+  <article class="tool" id="tool" data-mode="edit">
+    <header class="tool__head">
+      <p class="eyebrow">Days</p>
+      <h1 class="tool__title">{pageTitle}</h1>
+      <p class="tool__lead" id="tool-lead">
+        {summary}
+      </p>
+    </header>
+
+    <section class="bench">
+      <div class="bench__rule" aria-hidden="true"></div>
+
+      <div class="bench__fields" id="fields">
+        <div class="bench__field">
+          <label class="bench__label" for="card-title">
+            Title
+          </label>
+          <input
+            class="bench__input"
+            id="card-title"
+            name="title"
+            type="text"
+            maxlength="60"
+            autocomplete="off"
+            placeholder="e.g. Graduation"
+            aria-describedby="card-title-error"
+          />
+          <p class="bench__error" id="card-title-error"></p>
+        </div>
+
+        <div class="bench__field">
+          <label class="bench__label" for="card-date">
+            Date
+          </label>
+          <input
+            class="bench__input"
+            id="card-date"
+            name="date"
+            type="date"
+            autocomplete="off"
+            aria-describedby="card-date-error"
+          />
+          <p class="bench__error" id="card-date-error"></p>
+        </div>
+
+        <fieldset class="bench__field card-theme">
+          <legend class="bench__label">Theme</legend>
+          <div class="card-theme__options">
+            <label class="card-theme__option">
+              <input type="radio" name="theme" id="theme-light" value="light" checked />
+              <span>Light</span>
+            </label>
+            <label class="card-theme__option">
+              <input type="radio" name="theme" id="theme-midnight" value="midnight" />
+              <span>Midnight</span>
+            </label>
+            <label class="card-theme__option">
+              <input type="radio" name="theme" id="theme-warm" value="warm" />
+              <span>Warm</span>
+            </label>
+          </div>
+          <p class="bench__error" id="card-theme-error"></p>
+        </fieldset>
+
+        <div class="bench__field">
+          <label class="bench__label" for="card-note">
+            Note
+          </label>
+          <input
+            class="bench__input"
+            id="card-note"
+            name="note"
+            type="text"
+            maxlength="80"
+            autocomplete="off"
+            placeholder="Optional, e.g. Ceremony starts at 10:00"
+            aria-describedby="card-note-error note-count"
+          />
+          <p class="bench__count" id="note-count" aria-hidden="true">
+            0 / 80
+          </p>
+          <p class="bench__error" id="card-note-error"></p>
+        </div>
+      </div>
+
+      <output class="readout" id="readout" data-state="pending" aria-live="polite">
+        <p class="readout__label">Your card</p>
+        <div class="card" id="card" data-theme="light" hidden>
+          <p class="card__title" id="card-title-label" hidden></p>
+          <p class="card__headline" id="card-headline"></p>
+          <p class="card__date" id="card-date-label"></p>
+          <p class="card__note" id="card-note-label" hidden></p>
+          <p class="card__brand" aria-hidden="true">
+            plainkit.app
+          </p>
+        </div>
+        <p class="readout__note" id="readout-note">
+          Pick a date to create your card.
+        </p>
+      </output>
+
+      <div class="tool__actions" id="editor-actions">
+        <button type="button" class="btn" data-variant="primary" id="copy-link" disabled>
+          Copy link
+        </button>
+        <button type="button" class="btn" id="download-image" disabled>
+          Download image
+        </button>
+      </div>
+
+      <div class="tool__actions" id="view-actions">
+        <a class="btn" data-variant="primary" href={href('tools/countdown-card/')}>
+          Make your own
+        </a>
+      </div>
+    </section>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">How this is calculated</h2>
+      <p class="tool__notes-body">
+        The day count compares midnight of your date with midnight of today, in your device's own
+        time zone. A future date counts down ("265 days to go"), a past date counts up ("996 days
+        ago"), and today gets its own message.
+      </p>
+
+      <h2 class="tool__notes-title">Sharing</h2>
+      <p class="tool__notes-body">
+        Copy link gives you a link that opens the card directly — the whole card lives in the link
+        itself, so it keeps counting down on its own. Download image saves a square PNG with a small
+        plainkit.app mark in the corner.
+      </p>
+
+      <h2 class="tool__notes-title">Private by default</h2>
+      <p class="tool__notes-body">
+        Everything is calculated on your device. Nothing you type is sent anywhere — there is no
+        server to send it to.
+      </p>
+    </section>
+  </article>
+</BaseLayout>
+
+<script>
+  import { drawCountdownCard } from '@/lib/shared/canvas-card';
+  import type { CardContent } from '@/lib/shared/canvas-card';
+  import {
+    computeCountdown,
+    decodeState,
+    encodeState,
+    formatTargetDate,
+    parseDate,
+    parseNote,
+    parseTheme,
+    parseTitle,
+  } from '@/lib/tools/countdown-card';
+  import type { CountdownCardState } from '@/lib/tools/countdown-card';
+
+  /** 用户是否已经动过任何字段——初始空状态不显示错误（与 grade-calculator 同约定）。 */
+  let touched = false;
+  /** 最近一次全部有效的输入，供 Copy link / Download 使用；无效时为 null。 */
+  let lastState: CountdownCardState | null = null;
+
+  /**
+   * 页面初始化。
+   *
+   * DOM 引用在守卫之后收进 fields / view 两个别名对象（strictest 下窄化不进
+   * 闭包，直接引用 querySelector 返回值会整片报 possibly-null）。
+   * 任何元素缺失时抛错，由顶层保护接住，页面保持可读（DESIGN.md §9.3）。
+   */
+  function init(): void {
+    const tool = document.querySelector('#tool');
+    const lead = document.querySelector('#tool-lead');
+    const titleInput = document.querySelector('#card-title');
+    const dateInput = document.querySelector('#card-date');
+    const themeLight = document.querySelector('#theme-light');
+    const themeMidnight = document.querySelector('#theme-midnight');
+    const themeWarm = document.querySelector('#theme-warm');
+    const noteInput = document.querySelector('#card-note');
+    const noteCount = document.querySelector('#note-count');
+    const readout = document.querySelector('#readout');
+    const card = document.querySelector('#card');
+    const cardTitle = document.querySelector('#card-title-label');
+    const cardHeadline = document.querySelector('#card-headline');
+    const cardDate = document.querySelector('#card-date-label');
+    const cardNote = document.querySelector('#card-note-label');
+    const readoutNote = document.querySelector('#readout-note');
+    const copyButton = document.querySelector('#copy-link');
+    const downloadButton = document.querySelector('#download-image');
+
+    if (
+      !(tool instanceof HTMLElement) ||
+      !(lead instanceof HTMLElement) ||
+      !(titleInput instanceof HTMLInputElement) ||
+      !(dateInput instanceof HTMLInputElement) ||
+      !(themeLight instanceof HTMLInputElement) ||
+      !(themeMidnight instanceof HTMLInputElement) ||
+      !(themeWarm instanceof HTMLInputElement) ||
+      !(noteInput instanceof HTMLInputElement) ||
+      !(noteCount instanceof HTMLElement) ||
+      !(readout instanceof HTMLElement) ||
+      !(card instanceof HTMLElement) ||
+      !(cardTitle instanceof HTMLElement) ||
+      !(cardHeadline instanceof HTMLElement) ||
+      !(cardDate instanceof HTMLElement) ||
+      !(cardNote instanceof HTMLElement) ||
+      !(readoutNote instanceof HTMLElement) ||
+      !(copyButton instanceof HTMLButtonElement) ||
+      !(downloadButton instanceof HTMLButtonElement)
+    ) {
+      throw new Error('countdown-card: required elements not found');
+    }
+
+    const themeRadios = [themeLight, themeMidnight, themeWarm];
+    // 字段对象在守卫【之后】创建，属性类型已定型；嵌套函数里引用属性，
+    // 不依赖跨闭包的类型窄化（strictest 下窄化不进闭包）
+    const inputs = { title: titleInput, date: dateInput, note: noteInput };
+    const view = {
+      tool,
+      lead,
+      noteCount,
+      readout,
+      card,
+      cardTitle,
+      cardHeadline,
+      cardDate,
+      cardNote,
+      readoutNote,
+      copyButton,
+      downloadButton,
+    };
+
+    function setError(input: HTMLInputElement, errorId: string, message: string): void {
+      const errorEl = document.querySelector(`#${errorId}`);
+      if (!(errorEl instanceof HTMLElement)) return;
+      errorEl.textContent = message;
+      if (message === '') {
+        input.removeAttribute('aria-invalid');
+      } else {
+        input.setAttribute('aria-invalid', 'true');
+      }
+    }
+
+    function renderPending(): void {
+      view.readout.dataset.state = 'pending';
+      view.card.hidden = true;
+      view.readoutNote.hidden = false;
+      view.readoutNote.textContent = 'Pick a date to create your card.';
+      view.copyButton.disabled = true;
+      view.downloadButton.disabled = true;
+    }
+
+    /** 重新校验并渲染卡片。输入变化即调用；URL 同步也在这里完成。 */
+    function render(): void {
+      lastState = null;
+
+      const title = parseTitle(inputs.title.value);
+      const date = parseDate(inputs.date.value);
+      const checkedTheme = themeRadios.find((radio) => radio.checked);
+      const theme = parseTheme(checkedTheme ? checkedTheme.value : '');
+      const note = parseNote(inputs.note.value);
+
+      setError(inputs.title, 'card-title-error', touched && !title.ok ? title.message : '');
+      setError(inputs.date, 'card-date-error', touched && !date.ok ? date.message : '');
+      setError(inputs.note, 'card-note-error', touched && !note.ok ? note.message : '');
+      view.noteCount.textContent = `${inputs.note.value.length} / 80`;
+
+      if (!title.ok || !date.ok || !theme.ok || !note.ok) {
+        renderPending();
+        syncUrl(null);
+        return;
+      }
+
+      // 全部有效；先记下可分享状态，再渲染
+      const state: CountdownCardState = {
+        title: title.value,
+        date: date.value,
+        theme: theme.value,
+        note: note.value,
+      };
+      lastState = state;
+      syncUrl(state);
+
+      const countdown = computeCountdown(state.date, new Date());
+      view.card.dataset.theme = state.theme;
+      if (state.title === '') {
+        view.cardTitle.hidden = true;
+      } else {
+        view.cardTitle.hidden = false;
+        view.cardTitle.textContent = state.title;
+      }
+      view.cardHeadline.textContent = countdown.headline;
+      view.cardDate.textContent = formatTargetDate(state.date);
+      if (state.note === '') {
+        view.cardNote.hidden = true;
+      } else {
+        view.cardNote.hidden = false;
+        view.cardNote.textContent = state.note;
+      }
+      view.readout.dataset.state = 'ok';
+      view.card.hidden = false;
+      view.readoutNote.hidden = true;
+      view.copyButton.disabled = false;
+      view.downloadButton.disabled = false;
+    }
+
+    /** 把当前状态同步进地址栏（Copy link 的基础）；无效时清掉参数。 */
+    function syncUrl(state: CountdownCardState | null): void {
+      const url = new URL(window.location.href);
+      url.search = state ? encodeState(state).toString() : '';
+      window.history.replaceState(null, '', url);
+    }
+
+    for (const input of [inputs.title, inputs.date, inputs.note]) {
+      input.addEventListener('input', () => {
+        touched = true;
+        render();
+      });
+    }
+    for (const radio of themeRadios) {
+      radio.addEventListener('change', () => {
+        touched = true;
+        render();
+      });
+    }
+
+    // ── Copy link（AC-006 / AC-018）────────────────────────────────────
+    let copyResetTimer = 0;
+    function resetCopyLabelLater(): void {
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        view.copyButton.textContent = 'Copy link';
+      }, 2000);
+    }
+
+    view.copyButton.addEventListener('click', () => {
+      if (!lastState) return;
+      const url = new URL(window.location.href);
+      url.search = encodeState(lastState).toString();
+
+      const write = navigator.clipboard?.writeText(url.href);
+      if (!write) {
+        view.copyButton.textContent = 'Copying is not available in this browser';
+        resetCopyLabelLater();
+        return;
+      }
+
+      write
+        .then(() => {
+          view.copyButton.textContent = 'Link copied';
+        })
+        .catch(() => {
+          view.copyButton.textContent = 'Copying was blocked — copy the address bar link instead';
+        })
+        .finally(resetCopyLabelLater);
+    });
+
+    // ── Download image（AC-005 / AC-018）：1080×1080 PNG ───────────────
+    view.downloadButton.addEventListener('click', () => {
+      if (!lastState) return;
+      const countdown = computeCountdown(lastState.date, new Date());
+      const content: CardContent = {
+        title: lastState.title,
+        headline: countdown.headline,
+        dateLabel: formatTargetDate(lastState.date),
+        note: lastState.note,
+        theme: lastState.theme,
+      };
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1080;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        view.downloadButton.textContent = 'Not available in this browser';
+        return;
+      }
+      drawCountdownCard(ctx, content);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          view.downloadButton.textContent = 'Export failed — try again';
+          return;
+        }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `countdown-${lastState?.date ?? 'card'}.png`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }, 'image/png');
+    });
+
+    // ── 分享链接：合法参数 → 观览模式（AC-007 / AC-015）─────────────────
+    const decoded = decodeState(new URLSearchParams(window.location.search));
+    if (decoded) {
+      inputs.title.value = decoded.title;
+      inputs.date.value = decoded.date;
+      const radio = themeRadios.find((element) => element.value === decoded.theme);
+      if (radio) radio.checked = true;
+      inputs.note.value = decoded.note;
+      touched = true;
+      view.tool.dataset.mode = 'view';
+      view.lead.textContent = 'A shared countdown card, counting down in real time.';
+    }
+
+    render();
+  }
+
+  // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
+  try {
+    init();
+  } catch {
+    // 页面无 JS 时本来就完整可读（渐进增强），这里保持静默
+  }
+</script>
+
+<style>
+  /* 主题选择：三个横排选项，占满可用宽度 */
+  .card-theme {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+
+  .card-theme__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .card-theme__option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition:
+      border-color var(--dur-state) var(--ease-out),
+      background-color var(--dur-state) var(--ease-out);
+  }
+
+  .card-theme__option:hover {
+    border-color: var(--ink-faint);
+  }
+
+  .card-theme__option:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .card-theme__option input {
+    accent-color: var(--accent);
+  }
+
+  .bench__count {
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 卡片预览：分享产物的 1:1 呈现，颜色随主题切换 */
+  .card {
+    --card-bg: var(--bg);
+    --card-ink: var(--ink);
+    --card-muted: var(--ink-muted);
+    --card-accent: var(--accent);
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    aspect-ratio: 1;
+    width: min(100%, 420px);
+    margin-inline: auto;
+    padding: var(--space-6);
+    background: var(--card-bg);
+    color: var(--card-ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    text-align: center;
+  }
+
+  /* deviation: 预览卡与 midnight/warm 主题使用经用户批准的卡片令牌（DESIGN §6-bis.2） */
+  .card[data-theme='midnight'] {
+    --card-bg: var(--card-midnight-bg);
+    --card-ink: var(--card-midnight-ink);
+    --card-muted: var(--card-midnight-muted);
+    --card-accent: var(--card-midnight-accent);
+    border-color: var(--card-midnight-bg);
+  }
+
+  .card[data-theme='warm'] {
+    --card-bg: var(--warn-wash);
+    --card-ink: var(--card-warm-ink);
+    --card-muted: var(--warn);
+    --card-accent: var(--warn);
+    border-color: var(--warn-wash);
+  }
+
+  .card__title {
+    font-size: var(--text-xl);
+    font-weight: 500;
+    letter-spacing: var(--tracking-tight);
+    color: var(--card-muted);
+  }
+
+  .card__headline {
+    font-size: clamp(32px, 9vw, 72px);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: var(--tracking-tighter);
+    font-variant-numeric: tabular-nums;
+    color: var(--card-accent);
+    overflow-wrap: break-word;
+  }
+
+  .card__date {
+    font-size: var(--text-base);
+    color: var(--card-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card__note {
+    max-width: 36ch;
+    font-size: var(--text-sm);
+    color: var(--card-ink);
+    overflow-wrap: break-word;
+  }
+
+  .card__brand {
+    position: absolute;
+  }
+
+  .card {
+    position: relative;
+  }
+
+  .card__brand {
+    right: var(--space-4);
+    bottom: var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--card-muted);
+  }
+
+  /* 观览模式：隐藏编辑元素，只留卡片与 Make your own（AC-007） */
+  .tool[data-mode='view'] .bench__fields,
+  .tool[data-mode='view'] #editor-actions,
+  .tool[data-mode='view'] .tool__notes {
+    display: none;
+  }
+
+  #view-actions {
+    display: none;
+  }
+
+  .tool[data-mode='view'] #view-actions {
+    display: flex;
+  }
+</style>
