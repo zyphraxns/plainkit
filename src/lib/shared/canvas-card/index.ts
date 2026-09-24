@@ -148,3 +148,189 @@ export function drawCountdownCard(ctx: CanvasRenderingContext2D, content: CardCo
 
   ctx.restore();
 }
+
+// ---------------------------------------------------------------------------
+// 工具 5：随机分组 / 抽签结果卡片
+// ---------------------------------------------------------------------------
+
+/** 分组卡片的一块内容：一个组（或抽人/排序模式下的无标签整列）。 */
+export interface GroupCardGroup {
+  /** 组名（如 "Group 1"）；空串 = 不渲染标签行（抽人 / 随机排序模式） */
+  label: string;
+  /** 截断后的成员名行（布局计算时按列宽截断超长名） */
+  memberLines: string[];
+  /** 标签行（布局用）；无标签组为空数组 */
+  labelLines: string[];
+}
+
+/** computeGroupCardLayout 的输出：drawGroupCard 据此机械绘制。 */
+export interface GroupCardLayout {
+  width: number;
+  height: number;
+  /** 内容区底边的 y 坐标（页脚在此之下） */
+  contentBottom: number;
+  /** 按列分好的组；列数 1–3 */
+  columns: GroupCardGroup[][];
+}
+
+/** 分组卡片需要的内容（逻辑层已算好文案）。 */
+export interface GroupCardContent {
+  /** 卡片标题；空串 = 不渲染 */
+  title: string;
+  /** 模式摘要，如 "4 groups" / "5 picked names" */
+  modeLabel: string;
+  groups: GroupCardGroupInput[];
+  /** 日期文本，如 "September 24, 2026" */
+  dateLabel: string;
+}
+
+interface GroupCardGroupInput {
+  label: string;
+  members: string[];
+}
+
+/** 卡片排版常量（宽固定 1080，高按内容增长）。 */
+const CARD_WIDTH = 1080;
+const CARD_MARGIN = 80;
+const COLUMN_GAP = 48;
+const MEMBER_SIZE = 34;
+const LABEL_SIZE = 40;
+const LINE_HEIGHT = 48;
+
+/** 布局用的假想字体度量回调（页面层传 ctx.measureText 的包装）。 */
+export type MeasureTextAt = (text: string, px: number) => number;
+
+const columnCount = (groupCount: number): number =>
+  groupCount <= 1 ? 1 : groupCount === 2 ? 2 : 3;
+
+/**
+ * 计算分组卡片的排版：列数、每组所在列、成员行截断、画布高度。
+ *
+ * 纯函数——度量通过 `measure` 注入，测试用假测量器即可覆盖（jsdom 无
+ * canvas）。绘制本身由 drawGroupCard 完成。
+ */
+export function computeGroupCardLayout(
+  content: GroupCardContent,
+  measure: MeasureTextAt,
+): GroupCardLayout {
+  const cols = columnCount(content.groups.length);
+  const columnWidth = (CARD_WIDTH - CARD_MARGIN * 2 - COLUMN_GAP * (cols - 1)) / cols;
+  const maxTextWidth = columnWidth - LINE_HEIGHT; // 组内左右各留一行高的边距
+
+  // 截断放不下的超长名：保底 1 个字符 + 省略号（AC-013 不丢名字，但
+  // 单个名字物理放不下时只能截断，否则卡片会被撑破）。
+  const fitName = (name: string): string => {
+    if (measure(name, MEMBER_SIZE) <= maxTextWidth) return name;
+    let cut = name.length;
+    while (cut > 1 && measure(`${name.slice(0, cut - 1)}…`, MEMBER_SIZE) > maxTextWidth) {
+      cut -= 1;
+    }
+    return `${name.slice(0, Math.max(cut - 1, 1))}…`;
+  };
+
+  const groups: GroupCardGroup[] = content.groups.map((group) => ({
+    label: group.label,
+    memberLines: group.members.map(fitName),
+    labelLines: group.label === '' ? [] : [group.label],
+  }));
+
+  // 估算每块高度（标签行 + 成员行），按最矮列贪心分配，保持各栏高度接近。
+  const blockHeight = (group: GroupCardGroup): number =>
+    (group.labelLines.length + group.memberLines.length) * LINE_HEIGHT;
+  const columns: GroupCardGroup[][] = Array.from({ length: cols }, () => []);
+  const heights = new Array<number>(cols).fill(0);
+  for (const group of groups) {
+    let target = 0;
+    for (let i = 1; i < cols; i += 1) {
+      if ((heights[i] ?? 0) < (heights[target] ?? 0)) target = i;
+    }
+    columns[target]!.push(group);
+    heights[target] = (heights[target] ?? 0) + blockHeight(group) + LINE_HEIGHT; // + 组间空隙
+  }
+
+  // 头部：标题（可选）→ 模式摘要 → 日期，基线位置固定偏移。
+  const titleBaseline = 150;
+  const modeBaseline = content.title === '' ? 170 : titleBaseline + 84;
+  const dateBaseline = modeBaseline + 62;
+  const contentTop = dateBaseline + 70;
+  const contentBottom = contentTop + Math.max(...heights, LINE_HEIGHT);
+  const height = contentBottom + 110; // 底部留页脚（站点标识）空间
+
+  return { width: CARD_WIDTH, height, contentBottom, columns };
+}
+
+/**
+ * 在画布上绘制随机分组 / 抽签结果卡片，右下角带 plainkit.app 站点标识。
+ *
+ * 画布宽 1080、高由 computeGroupCardLayout 决定；调用方负责创建画布
+ * （含 2 倍分辨率处理）与下载/展示。
+ */
+export function drawGroupCard(ctx: CanvasRenderingContext2D, content: GroupCardContent): void {
+  const measure: MeasureTextAt = (text, px) => {
+    ctx.font = `400 ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    return ctx.measureText(text).width;
+  };
+  const layout = computeGroupCardLayout(content, measure);
+  const colors = CARD_THEMES.light;
+  const FONT = (px: number, weight = 400) =>
+    `${weight} ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+
+  ctx.save();
+  ctx.fillStyle = colors.background;
+  ctx.fillRect(0, 0, layout.width, layout.height);
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+
+  // 头部三行的基线与布局计算保持同一套偏移。
+  const titleBaseline = 150;
+  const modeBaseline = content.title === '' ? 170 : titleBaseline + 84;
+  const dateBaseline = modeBaseline + 62;
+
+  if (content.title !== '') {
+    ctx.font = FONT(64, 500);
+    ctx.fillStyle = colors.ink;
+    ctx.fillText(content.title, CARD_MARGIN, titleBaseline);
+  }
+
+  ctx.font = FONT(44, 600);
+  ctx.fillStyle = colors.accent;
+  ctx.fillText(content.modeLabel, CARD_MARGIN, modeBaseline);
+
+  ctx.font = FONT(36);
+  ctx.fillStyle = colors.muted;
+  ctx.fillText(content.dateLabel, CARD_MARGIN, dateBaseline);
+
+  // 内容起始 y 与 computeGroupCardLayout 的 contentTop 同一偏移。
+  const contentTop = dateBaseline + 70;
+  const columnWidth =
+    (layout.width - CARD_MARGIN * 2 - COLUMN_GAP * (layout.columns.length - 1)) /
+    layout.columns.length;
+  layout.columns.forEach((column, colIndex) => {
+    const x = CARD_MARGIN + colIndex * (columnWidth + COLUMN_GAP) + LINE_HEIGHT / 2;
+    let cursor = contentTop;
+    for (const group of column) {
+      if (group.label !== '') {
+        ctx.font = FONT(LABEL_SIZE, 600);
+        ctx.fillStyle = colors.accent;
+        cursor += LABEL_SIZE;
+        ctx.fillText(group.labelLines[0] ?? '', x, cursor);
+        cursor += LINE_HEIGHT - LABEL_SIZE;
+      }
+      ctx.font = FONT(MEMBER_SIZE);
+      ctx.fillStyle = colors.ink;
+      for (const line of group.memberLines) {
+        cursor += LINE_HEIGHT;
+        ctx.fillText(line, x, cursor);
+      }
+      cursor += LINE_HEIGHT; // 组间空隙，与布局估算一致
+    }
+  });
+
+  // 站点标识：右下角（产品概述 §6.1）。
+  ctx.font = FONT(30, 500);
+  ctx.fillStyle = colors.muted;
+  ctx.textAlign = 'right';
+  ctx.fillText('plainkit.app', layout.width - CARD_MARGIN, layout.height - 70);
+
+  ctx.restore();
+}

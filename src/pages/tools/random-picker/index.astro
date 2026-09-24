@@ -1,0 +1,687 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const pageTitle = 'Random group & name picker';
+const description =
+  'Paste a list of names and split it into random groups, draw names without repeats, or shuffle the order. Free, no ads, nothing leaves your device.';
+const summary =
+  'Random groups, name draws and shuffles from any list — with a result card worth sharing.';
+---
+
+<BaseLayout title={pageTitle} description={description} tool="random-picker">
+  <article class="tool" id="tool">
+    <header class="tool__head">
+      <p class="eyebrow">Randomness</p>
+      <h1 class="tool__title">{pageTitle}</h1>
+      <p class="tool__lead">{summary}</p>
+    </header>
+
+    <section class="bench">
+      <div class="bench__rule" aria-hidden="true"></div>
+
+      <div class="bench__fields" id="fields">
+        <div class="bench__field">
+          <label class="bench__label" for="names">
+            Names{' '}
+            <span class="bench__label-hint" id="names-count">
+              0 names
+            </span>
+          </label>
+          <textarea
+            class="bench__input bench__input--area"
+            id="names"
+            name="names"
+            rows="8"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="One name per line (commas work too)"
+            aria-describedby="names-hint dup-warning"
+          ></textarea>
+          <p class="bench__error" id="names-hint" role="status"></p>
+          <p class="bench__error bench__error--action" id="dup-warning" hidden>
+            <span id="dup-names"></span>
+            <button type="button" class="link-btn" id="dedupe">
+              Remove duplicates
+            </button>
+          </p>
+          <button type="button" class="link-btn bench__clear" id="clear">
+            Clear list
+          </button>
+        </div>
+
+        <div class="bench__field">
+          <span class="bench__label" id="mode-label">
+            Mode
+          </span>
+          <div class="mode-switch" role="radiogroup" aria-labelledby="mode-label">
+            <label class="mode-switch__option">
+              <input type="radio" name="mode" id="mode-groups" value="groups" checked />
+              <span>Groups</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="mode" id="mode-pick" value="pick" />
+              <span>Pick names</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="mode" id="mode-order" value="order" />
+              <span>Random order</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="bench__field" id="group-by-field">
+          <label class="bench__label" for="group-by">
+            Split by
+          </label>
+          <select class="bench__input" id="group-by" name="group-by">
+            <option value="count">Number of groups</option>
+            <option value="size">People per group</option>
+          </select>
+        </div>
+
+        <div class="bench__field" id="param-field">
+          <label class="bench__label" for="param" id="param-label">
+            Number of groups
+          </label>
+          <input
+            class="bench__input"
+            id="param"
+            name="param"
+            type="number"
+            min="1"
+            step="1"
+            value="4"
+            autocomplete="off"
+            aria-describedby="param-error"
+          />
+          <p class="bench__error" id="param-error"></p>
+        </div>
+
+        <div class="bench__field">
+          <button type="button" class="btn" data-variant="primary" id="generate" disabled>
+            Generate
+          </button>
+        </div>
+      </div>
+
+      <output class="readout" id="readout" data-state="pending" aria-live="polite">
+        <p class="readout__label">Result</p>
+        <div class="result" id="result" hidden></div>
+        <p class="readout__note" id="readout-note">
+          Enter at least 2 names, then press Generate.
+        </p>
+      </output>
+
+      <div class="tool__actions">
+        <button type="button" class="btn" data-variant="primary" id="regenerate" disabled>
+          Regenerate
+        </button>
+        <button type="button" class="btn" id="copy-text" disabled>
+          Copy text
+        </button>
+        <button type="button" class="btn" id="download-image" disabled>
+          Download image
+        </button>
+      </div>
+    </section>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">How the randomness works</h2>
+      <p class="tool__notes-body">
+        Names are shuffled with your browser's cryptographic random number generator, so every name
+        has an equal chance — and drawn names never repeat. Groups are balanced: with 23 people in 4
+        groups you get groups of 6, 6, 6 and 5.
+      </p>
+
+      <h2 class="tool__notes-title">Sharing</h2>
+      <p class="tool__notes-body">
+        Copy text gives you a plain list ready to paste into any chat. Download image saves a PNG
+        card with the results and a small plainkit.app mark in the corner.
+      </p>
+
+      <h2 class="tool__notes-title">Private by default</h2>
+      <p class="tool__notes-body">
+        Everything happens on your device — no server, no tracking. Your list is kept in this
+        browser only so you don't have to paste it again next time; Clear list removes it right
+        away.
+      </p>
+    </section>
+  </article>
+</BaseLayout>
+
+<script>
+  import { drawGroupCard, computeGroupCardLayout } from '@/lib/shared/canvas-card';
+  import type { GroupCardContent } from '@/lib/shared/canvas-card';
+  import {
+    assignGroups,
+    formatGroupsText,
+    formatListText,
+    parseCount,
+    pickNames,
+    shuffle,
+    splitNames,
+    dedupeNames,
+  } from '@/lib/tools/random-picker';
+  import type { RandomSource } from '@/lib/tools/random-picker';
+
+  const MAX_NAMES = 300;
+  const STORAGE_KEY = 'plainkit.random-picker.names';
+
+  type Mode = 'groups' | 'pick' | 'order';
+  type GroupBy = 'count' | 'size';
+
+  /** 最近一次成功生成的结果，供 Regenerate / Copy / Download 使用。 */
+  interface PickerResult {
+    mode: Mode;
+    groupBy: GroupBy;
+    param: number;
+    groups: { label: string; members: string[] }[];
+    members: string[];
+    modeLabel: string;
+  }
+
+  /** 加密安全的随机源（BR-003）。 */
+  const cryptoRandom: RandomSource = () => {
+    const buffer = new Uint32Array(1);
+    crypto.getRandomValues(buffer);
+    return buffer[0]! / 2 ** 32;
+  };
+
+  function init(): void {
+    const namesInput = document.querySelector('#names');
+    const namesCount = document.querySelector('#names-count');
+    const namesHint = document.querySelector('#names-hint');
+    const dupWarning = document.querySelector('#dup-warning');
+    const dupNames = document.querySelector('#dup-names');
+    const dedupeButton = document.querySelector('#dedupe');
+    const clearButton = document.querySelector('#clear');
+    const modeGroups = document.querySelector('#mode-groups');
+    const modePick = document.querySelector('#mode-pick');
+    const modeOrder = document.querySelector('#mode-order');
+    const groupByField = document.querySelector('#group-by-field');
+    const groupBySelect = document.querySelector('#group-by');
+    const paramField = document.querySelector('#param-field');
+    const paramLabel = document.querySelector('#param-label');
+    const paramInput = document.querySelector('#param');
+    const paramError = document.querySelector('#param-error');
+    const generateButton = document.querySelector('#generate');
+    const readout = document.querySelector('#readout');
+    const resultBox = document.querySelector('#result');
+    const readoutNote = document.querySelector('#readout-note');
+    const regenerateButton = document.querySelector('#regenerate');
+    const copyButton = document.querySelector('#copy-text');
+    const downloadButton = document.querySelector('#download-image');
+
+    if (
+      !(namesInput instanceof HTMLTextAreaElement) ||
+      !(namesCount instanceof HTMLElement) ||
+      !(namesHint instanceof HTMLElement) ||
+      !(dupWarning instanceof HTMLElement) ||
+      !(dupNames instanceof HTMLElement) ||
+      !(dedupeButton instanceof HTMLButtonElement) ||
+      !(modeGroups instanceof HTMLInputElement) ||
+      !(modePick instanceof HTMLInputElement) ||
+      !(modeOrder instanceof HTMLInputElement) ||
+      !(groupByField instanceof HTMLElement) ||
+      !(groupBySelect instanceof HTMLSelectElement) ||
+      !(paramField instanceof HTMLElement) ||
+      !(paramLabel instanceof HTMLElement) ||
+      !(paramInput instanceof HTMLInputElement) ||
+      !(paramError instanceof HTMLElement) ||
+      !(generateButton instanceof HTMLButtonElement) ||
+      !(readout instanceof HTMLElement) ||
+      !(resultBox instanceof HTMLElement) ||
+      !(readoutNote instanceof HTMLElement) ||
+      !(regenerateButton instanceof HTMLButtonElement) ||
+      !(copyButton instanceof HTMLButtonElement) ||
+      !(downloadButton instanceof HTMLButtonElement)
+    ) {
+      throw new Error('random-picker: required elements not found');
+    }
+
+    const clearButton2 = clearButton instanceof HTMLButtonElement ? clearButton : null;
+    const modeRadios = [modeGroups, modePick, modeOrder];
+    let lastResult: PickerResult | null = null;
+    let copyResetTimer = 0;
+    /** 用户是否动过名单框——初始空状态不显示红色引导（与 grade-calculator 同约定）。 */
+    let namesTouched = false;
+
+    const view = {
+      namesInput,
+      namesCount,
+      namesHint,
+      dupWarning,
+      dupNames,
+      dedupeButton,
+      groupByField,
+      groupBySelect,
+      paramField,
+      paramLabel,
+      paramInput,
+      paramError,
+      generateButton,
+      readout,
+      resultBox,
+      readoutNote,
+      regenerateButton,
+      copyButton,
+      downloadButton,
+    };
+
+    const currentMode = (): Mode => {
+      const checked = modeRadios.find((radio) => radio.checked);
+      return (checked?.value as Mode | undefined) ?? 'groups';
+    };
+
+    /** 生成今日日期文本，如 "September 24, 2026"（en-US，确定性输出）。 */
+    function todayLabel(): string {
+      return new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    }
+
+    /** 参数字段的标签与可见性随模式变化。 */
+    function syncParamField(): void {
+      const mode = currentMode();
+      const groupBy = view.groupBySelect.value as GroupBy;
+      view.groupByField.hidden = mode !== 'groups';
+      view.paramField.hidden = mode === 'order';
+      if (mode === 'groups') {
+        view.paramLabel.textContent = groupBy === 'count' ? 'Number of groups' : 'People per group';
+      } else if (mode === 'pick') {
+        view.paramLabel.textContent = 'People to pick';
+      }
+    }
+
+    /** 名单解析 + 容量上限（AC-008 / 009 / 014）。 */
+    function readNames(): string[] {
+      const { names, duplicates } = splitNames(view.namesInput.value);
+      view.namesCount.textContent = `${names.length} ${names.length === 1 ? 'name' : 'names'}`;
+
+      if (duplicates.length > 0) {
+        view.dupWarning.hidden = false;
+        view.dupNames.textContent = `Duplicate names: ${duplicates.join(', ')}.`;
+      } else {
+        view.dupWarning.hidden = true;
+      }
+
+      if (names.length > MAX_NAMES) {
+        view.namesHint.textContent = `Only the first ${MAX_NAMES} names are used.`;
+        return names.slice(0, MAX_NAMES);
+      }
+      view.namesHint.textContent = '';
+      return names;
+    }
+
+    function renderPending(note: string): void {
+      lastResult = null;
+      view.readout.dataset.state = 'pending';
+      view.resultBox.hidden = true;
+      view.resultBox.textContent = '';
+      view.readoutNote.hidden = false;
+      view.readoutNote.textContent = note;
+      view.regenerateButton.disabled = true;
+      view.copyButton.disabled = true;
+      view.downloadButton.disabled = true;
+    }
+
+    /** 重新校验输入并更新 Generate 按钮与提示（AC-010）；未输入过的空页面不显示红色错误。 */
+    function validate(): void {
+      const names = readNames();
+      if (names.length < 2) {
+        view.generateButton.disabled = true;
+        if (namesTouched && view.namesHint.textContent === '') {
+          view.namesHint.textContent = 'Enter at least 2 names.';
+        }
+      } else {
+        view.generateButton.disabled = false;
+      }
+    }
+
+    function renderResult(result: PickerResult): void {
+      lastResult = result;
+      view.resultBox.hidden = false;
+      view.resultBox.textContent = '';
+      view.readoutNote.hidden = true;
+      view.readout.dataset.state = 'ok';
+
+      for (const group of result.groups) {
+        const block = document.createElement('div');
+        block.className = 'result__group';
+        if (group.label !== '') {
+          const label = document.createElement('p');
+          label.className = 'result__label';
+          label.textContent = group.label;
+          block.append(label);
+        }
+        const list = document.createElement('ul');
+        list.className = 'result__list';
+        for (const member of group.members) {
+          const item = document.createElement('li');
+          item.textContent = member;
+          list.append(item);
+        }
+        block.append(list);
+        view.resultBox.append(block);
+      }
+
+      view.regenerateButton.disabled = false;
+      view.copyButton.disabled = false;
+      view.downloadButton.disabled = false;
+    }
+
+    /** 用当前输入计算一次随机结果（Generate 与 Regenerate 共用，AC-007）。 */
+    function generate(): void {
+      const names = readNames();
+      if (names.length < 2) {
+        renderPending('Enter at least 2 names, then press Generate.');
+        return;
+      }
+
+      const mode = currentMode();
+      const groupBy = view.groupBySelect.value as GroupBy;
+      const paramLabel =
+        mode === 'groups'
+          ? groupBy === 'count'
+            ? 'Number of groups'
+            : 'People per group'
+          : 'People to pick';
+      const paramMax = mode === 'groups' && groupBy === 'size' ? names.length - 1 : names.length;
+      view.paramInput.max = String(paramMax);
+
+      let param = 0;
+      if (mode !== 'order') {
+        const parsed = parseCount(view.paramInput.value, paramMax, paramLabel);
+        if (!parsed.ok) {
+          view.paramError.textContent = parsed.message;
+          view.paramInput.setAttribute('aria-invalid', 'true');
+          renderPending('Fix the highlighted field and try again.');
+          return;
+        }
+        view.paramError.textContent = '';
+        view.paramInput.removeAttribute('aria-invalid');
+        param = parsed.value;
+      }
+
+      let groups: { label: string; members: string[] }[];
+      let members: string[];
+      let modeLabel: string;
+
+      if (mode === 'groups') {
+        const groupCount = groupBy === 'count' ? param : Math.ceil(names.length / param);
+        const assigned = assignGroups(names, groupCount, cryptoRandom);
+        groups = assigned.map((group, index) => ({ label: `Group ${index + 1}`, members: group }));
+        members = assigned.flat();
+        modeLabel = `${names.length} names in ${groupCount} groups`;
+      } else if (mode === 'pick') {
+        members = pickNames(names, param, cryptoRandom);
+        groups = [{ label: '', members }];
+        modeLabel = `${param} picked from ${names.length} names`;
+      } else {
+        members = shuffle(names, cryptoRandom);
+        groups = [{ label: '', members }];
+        modeLabel = `${names.length} names in random order`;
+      }
+
+      renderResult({ mode, groupBy, param, groups, members, modeLabel });
+    }
+
+    // ── 输入与名单持久化（AC-008 / 016）─────────────────────────────────
+    let clearArmed = false;
+    let clearResetTimer = 0;
+
+    function resetClearButton(): void {
+      clearArmed = false;
+      if (clearButton2) clearButton2.textContent = 'Clear list';
+    }
+
+    view.namesInput.addEventListener('input', () => {
+      namesTouched = true;
+      window.localStorage.setItem(STORAGE_KEY, view.namesInput.value);
+      validate();
+    });
+
+    view.dedupeButton.addEventListener('click', () => {
+      const { names } = splitNames(view.namesInput.value);
+      view.namesInput.value = dedupeNames(names).join('\n');
+      window.localStorage.setItem(STORAGE_KEY, view.namesInput.value);
+      validate();
+    });
+
+    if (clearButton2) {
+      clearButton2.addEventListener('click', () => {
+        if (!clearArmed) {
+          clearArmed = true;
+          clearButton2.textContent = 'Click again to confirm';
+          window.clearTimeout(clearResetTimer);
+          clearResetTimer = window.setTimeout(resetClearButton, 3000);
+          return;
+        }
+        window.clearTimeout(clearResetTimer);
+        resetClearButton();
+        view.namesInput.value = '';
+        window.localStorage.removeItem(STORAGE_KEY);
+        validate();
+        renderPending('Enter at least 2 names, then press Generate.');
+      });
+    }
+
+    // ── 模式与参数（AC-011 / 012）───────────────────────────────────────
+    for (const radio of modeRadios) {
+      radio.addEventListener('change', () => {
+        syncParamField();
+        validate();
+      });
+    }
+    view.groupBySelect.addEventListener('change', () => {
+      syncParamField();
+      validate();
+    });
+    view.paramInput.addEventListener('input', () => {
+      view.paramError.textContent = '';
+      view.paramInput.removeAttribute('aria-invalid');
+    });
+
+    view.generateButton.addEventListener('click', generate);
+    view.regenerateButton.addEventListener('click', generate);
+
+    // ── 复制文本（AC-006）───────────────────────────────────────────────
+    function resultText(result: PickerResult): string {
+      const header = `${result.modeLabel} · ${todayLabel()} · plainkit.app`;
+      if (result.groups.length === 1 && result.groups[0]!.label === '') {
+        return formatListText(result.members, header);
+      }
+      return formatGroupsText(
+        result.groups.map((group) => group.members),
+        header,
+      );
+    }
+
+    function resetCopyLabelLater(): void {
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        view.copyButton.textContent = 'Copy text';
+      }, 2000);
+    }
+
+    view.copyButton.addEventListener('click', () => {
+      if (!lastResult) return;
+      const write = navigator.clipboard?.writeText(resultText(lastResult));
+      if (!write) {
+        view.copyButton.textContent = 'Copying is not available in this browser';
+        resetCopyLabelLater();
+        return;
+      }
+      write
+        .then(() => {
+          view.copyButton.textContent = 'Copied';
+        })
+        .catch(() => {
+          view.copyButton.textContent = 'Copying was blocked';
+        })
+        .finally(resetCopyLabelLater);
+    });
+
+    // ── 图片导出（AC-005）：1080 宽、高度随内容 ────────────────────────
+    view.downloadButton.addEventListener('click', () => {
+      if (!lastResult) return;
+      const result = lastResult;
+      const content: GroupCardContent = {
+        title: '',
+        modeLabel: result.modeLabel,
+        groups: result.groups,
+        dateLabel: todayLabel(),
+      };
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        view.downloadButton.textContent = 'Not available in this browser';
+        return;
+      }
+      const measure = (text: string, px: number) => {
+        ctx.font = `400 ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+        return ctx.measureText(text).width;
+      };
+      canvas.height = computeGroupCardLayout(content, measure).height;
+
+      drawGroupCard(ctx, content);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          view.downloadButton.textContent = 'Export failed — try again';
+          return;
+        }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'random-groups.png';
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }, 'image/png');
+    });
+
+    // ── 初始化：恢复上次的名单（AC-016）────────────────────────────────
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved !== null) view.namesInput.value = saved;
+
+    // 页面里没有独立 clear 按钮的兜底：把清除动作挂在名单计数旁由模板提供
+    syncParamField();
+    validate();
+    renderPending('Enter at least 2 names, then press Generate.');
+  }
+
+  // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
+  try {
+    init();
+  } catch {
+    // 页面无 JS 时本来就完整可读（渐进增强），这里保持静默
+  }
+</script>
+
+<style>
+  .bench__label-hint {
+    font-weight: 400;
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bench__input--area {
+    resize: vertical;
+    font-family: inherit;
+  }
+
+  .link-btn {
+    border: 0;
+    padding: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .bench__error--action {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  /* display:flex 会覆盖 hidden 属性的默认样式，必须显式压回 */
+  .bench__error--action[hidden] {
+    display: none;
+  }
+
+  .bench__clear {
+    display: block;
+    margin-top: var(--space-2);
+  }
+
+  /* 模式切换：与倒计时卡片主题选项同一套视觉 */
+  .mode-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .mode-switch__option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition:
+      border-color var(--dur-state) var(--ease-out),
+      background-color var(--dur-state) var(--ease-out);
+  }
+
+  .mode-switch__option:hover {
+    border-color: var(--ink-faint);
+  }
+
+  .mode-switch__option:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .mode-switch__option input {
+    accent-color: var(--accent);
+  }
+
+  /* 结果区：分组按列排布，窄屏自动降为单列 */
+  .result {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-5);
+    width: 100%;
+    text-align: left;
+  }
+
+  .result__group {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+  }
+
+  .result__label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: var(--space-2);
+  }
+
+  .result__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: var(--text-base);
+    line-height: 1.7;
+  }
+</style>
