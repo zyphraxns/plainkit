@@ -25,9 +25,15 @@
 | 项目结构（s4） | ✅ 完成 → `项目结构.md` |
 | 开发规范 DESIGN.md（s5） | ✅ 完成 → `DESIGN.md` |
 | 项目初始化（s7） | ✅ 完成 → `docs/开发记录/初始化记录.md` |
-| 首批 5 个工具 | ⏳ 待做（顺序：1 → 2 → 4 → 5 → 3） |
+| 工具 1 成绩计算器（grade-calculator） | ✅ 已上线 |
+| 工具 2 倒计时卡片（countdown-card） | ✅ 已上线 |
+| 工具 4 日期时长（date-duration） | ✅ 已上线 |
+| 工具 5 随机分组（random-picker） | ✅ 已上线 |
+| 工具 6 图片→ASCII（ascii-art） | ✅ 已上线 |
+| 工具 7 二维码生成器（qr-code） | ⏳ s8/s9/s10 已完成，待 s11 实现 |
+| 工具 3 化学（chemistry） | ⏳ 二期复活制，见 `工具候选池.md` |
 
-> **骨架阶段已全部完成。** 下一步进入「每个工具一个对话」的循环，从成绩计算器（slug `grade-calculator`）开始。
+> **骨架阶段已全部完成，开发顺序 1 → 2 → 4 → 5 → 6 已全部上线。** 当前在工具 7 二维码生成器（slug `qr-code`），AC 已定稿（`features/qr-code.md`，32 条），下一步按 `features/qr-code_任务规划.md` 走 s11 TDD。
 
 ---
 

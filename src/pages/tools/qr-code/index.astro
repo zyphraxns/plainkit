@@ -1,0 +1,898 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const pageTitle = 'QR code generator';
+const description =
+  'Make a QR code for a link, Wi-Fi network, contact, email, phone number or text. Runs entirely in your browser — nothing is uploaded, no account needed.';
+const summary =
+  'Turn a link, Wi-Fi password or contact into a QR code you can print, post or send.';
+---
+
+<BaseLayout title={pageTitle} description={description} tool="qr-code">
+  <article class="tool" id="tool">
+    <header class="tool__head">
+      <p class="eyebrow">Utility</p>
+      <h1 class="tool__title">{pageTitle}</h1>
+      <p class="tool__lead">{summary}</p>
+    </header>
+
+    <section class="bench">
+      <div class="bench__rule" aria-hidden="true"></div>
+
+      <div class="bench__fields">
+        <div class="bench__field">
+          <span class="bench__label" id="type-label">
+            What goes in the code
+          </span>
+          <div class="type-switch" role="radiogroup" aria-labelledby="type-label">
+            <input
+              class="type-switch__input"
+              type="radio"
+              id="t-link"
+              name="qr-type"
+              value="link"
+              checked
+            />
+            <label class="type-switch__option" for="t-link">
+              Link
+            </label>
+            <input
+              class="type-switch__input"
+              type="radio"
+              id="t-text"
+              name="qr-type"
+              value="text"
+            />
+            <label class="type-switch__option" for="t-text">
+              Text
+            </label>
+            <input
+              class="type-switch__input"
+              type="radio"
+              id="t-wifi"
+              name="qr-type"
+              value="wifi"
+            />
+            <label class="type-switch__option" for="t-wifi">
+              Wi-Fi
+            </label>
+            <input
+              class="type-switch__input"
+              type="radio"
+              id="t-contact"
+              name="qr-type"
+              value="contact"
+            />
+            <label class="type-switch__option" for="t-contact">
+              Contact
+            </label>
+            <input
+              class="type-switch__input"
+              type="radio"
+              id="t-email"
+              name="qr-type"
+              value="email"
+            />
+            <label class="type-switch__option" for="t-email">
+              Email
+            </label>
+            <input
+              class="type-switch__input"
+              type="radio"
+              id="t-phone"
+              name="qr-type"
+              value="phone"
+            />
+            <label class="type-switch__option" for="t-phone">
+              Phone
+            </label>
+            <input class="type-switch__input" type="radio" id="t-sms" name="qr-type" value="sms" />
+            <label class="type-switch__option" for="t-sms">
+              Text message
+            </label>
+
+            <div class="type-panels">
+              <div class="type-panel" id="panel-link">
+                <label class="field">
+                  <span class="field__label">Website or link</span>
+                  <input
+                    class="bench__input"
+                    id="link-url"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="plainkit.app"
+                  />
+                </label>
+                <p class="field__hint" id="link-hint"></p>
+              </div>
+
+              <div class="type-panel" id="panel-text">
+                <label class="field">
+                  <span class="field__label">Text</span>
+                  <textarea
+                    class="bench__input bench__input--area"
+                    id="text-body"
+                    rows="3"
+                  ></textarea>
+                </label>
+              </div>
+
+              <div class="type-panel" id="panel-wifi">
+                <label class="field">
+                  <span class="field__label">Network name</span>
+                  <input class="bench__input" id="wifi-ssid" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Password</span>
+                  <input
+                    class="bench__input"
+                    id="wifi-password"
+                    type="password"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="field">
+                  <span class="field__label">Security</span>
+                  <select class="bench__input" id="wifi-security">
+                    <option value="wpa">WPA / WPA2 / WPA3</option>
+                    <option value="wep">WEP</option>
+                    <option value="none">Open network</option>
+                  </select>
+                </label>
+                <label class="check">
+                  <input type="checkbox" id="wifi-show" />
+                  <span>Show password</span>
+                </label>
+              </div>
+
+              <div class="type-panel" id="panel-contact">
+                <label class="field">
+                  <span class="field__label">Name</span>
+                  <input class="bench__input" id="contact-name" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Phone</span>
+                  <input class="bench__input" id="contact-phone" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Email</span>
+                  <input class="bench__input" id="contact-email" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Company</span>
+                  <input class="bench__input" id="contact-org" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Website</span>
+                  <input
+                    class="bench__input"
+                    id="contact-url"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="example.com"
+                  />
+                </label>
+              </div>
+
+              <div class="type-panel" id="panel-email">
+                <label class="field">
+                  <span class="field__label">To</span>
+                  <input class="bench__input" id="email-to" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Subject</span>
+                  <input class="bench__input" id="email-subject" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Message</span>
+                  <textarea
+                    class="bench__input bench__input--area"
+                    id="email-body"
+                    rows="3"
+                  ></textarea>
+                </label>
+              </div>
+
+              <div class="type-panel" id="panel-phone">
+                <label class="field">
+                  <span class="field__label">Phone number</span>
+                  <input class="bench__input" id="phone-number" type="text" autocomplete="off" />
+                </label>
+              </div>
+
+              <div class="type-panel" id="panel-sms">
+                <label class="field">
+                  <span class="field__label">Phone number</span>
+                  <input class="bench__input" id="sms-number" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Message</span>
+                  <textarea
+                    class="bench__input bench__input--area"
+                    id="sms-body"
+                    rows="3"
+                  ></textarea>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bench__field">
+          <span class="bench__label" id="color-label">
+            Color
+          </span>
+          <div class="swatches" role="radiogroup" aria-labelledby="color-label">
+            <label class="swatch">
+              <input
+                class="type-switch__input"
+                type="radio"
+                name="qr-color"
+                value="black"
+                checked
+              />
+              <span class="swatch__dot swatch__dot--black"></span>
+              <span class="swatch__name">Black</span>
+            </label>
+            <label class="swatch">
+              <input class="type-switch__input" type="radio" name="qr-color" value="navy" />
+              <span class="swatch__dot swatch__dot--navy"></span>
+              <span class="swatch__name">Navy</span>
+            </label>
+            <label class="swatch">
+              <input class="type-switch__input" type="radio" name="qr-color" value="forest" />
+              <span class="swatch__dot swatch__dot--forest"></span>
+              <span class="swatch__name">Forest</span>
+            </label>
+            <label class="swatch">
+              <input class="type-switch__input" type="radio" name="qr-color" value="maroon" />
+              <span class="swatch__dot swatch__dot--maroon"></span>
+              <span class="swatch__name">Maroon</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <output class="readout" id="readout" data-state="pending" aria-live="polite">
+        <p class="readout__label">Your QR code</p>
+        <div class="qr-preview" id="preview" hidden></div>
+        <p class="readout__note" id="readout-note">
+          Fill in a field above and the code appears here.
+        </p>
+        <p class="bench__error" id="error" role="status"></p>
+        <details class="encoded" id="encoded-details">
+          <summary class="encoded__summary">What is actually encoded</summary>
+          <pre class="encoded__body" id="encoded-text"></pre>
+          <p class="encoded__spec" id="encoded-spec"></p>
+        </details>
+      </output>
+
+      <div class="tool__actions">
+        <button type="button" class="btn" data-variant="primary" id="copy-image" disabled>
+          Copy image
+        </button>
+        <button type="button" class="btn" id="download-png" disabled>
+          Download PNG
+        </button>
+        <label class="action-size">
+          <span>Size</span>
+          <select class="bench__input bench__input--compact" id="png-size">
+            <option value="512">512 px</option>
+            <option value="1024" selected>
+              1024 px
+            </option>
+          </select>
+        </label>
+        <button type="button" class="link-btn" id="download-svg" disabled>
+          Download SVG
+        </button>
+      </div>
+    </section>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">How it works</h2>
+      <p class="tool__notes-body">
+        Everything you type is turned into a QR code inside this page. The code is drawn as sharp
+        squares with a quiet border around it, which is what scanners need to find it. Nothing is
+        uploaded — there is no server involved at all.
+      </p>
+
+      <h2 class="tool__notes-title">Printing</h2>
+      <p class="tool__notes-body">
+        Download the SVG for posters and anything printed large — it stays sharp at any size. Use
+        PNG for screens. If you print a code that will get dirty or folded, keep it bigger rather
+        than denser: shorten the link instead of shrinking the code.
+      </p>
+
+      <h2 class="tool__notes-title">Private by default</h2>
+      <p class="tool__notes-body">
+        Your Wi-Fi password, phone numbers and links never leave your device. Nothing is saved —
+        reload the page and every field is empty again.
+      </p>
+    </section>
+  </article>
+</BaseLayout>
+
+<script>
+  import {
+    buildEmailPayload,
+    buildLinkPayload,
+    buildPhonePayload,
+    buildSmsPayload,
+    buildTextPayload,
+    buildVCardPayload,
+    buildWifiPayload,
+  } from '@/lib/tools/qr-code';
+  import type { QrType, WifiInput } from '@/lib/tools/qr-code';
+  import { capacityBytes, describeMatrix, generateQr } from '@/lib/tools/qr-code/encoder';
+  import type { QrMatrix } from '@/lib/tools/qr-code/encoder';
+  import { matrixToSvg, qrCanvasLayout, renderQrCanvas } from '@/lib/tools/qr-code/render';
+
+  /** 四种预设深色（AC-012）。都足够深，保证在白底上扫得出来。 */
+  const COLORS: Record<string, string> = {
+    black: '#16191A',
+    navy: '#16325C',
+    forest: '#14532D',
+    maroon: '#6B2537',
+  };
+
+  const PROMPTS: Record<QrType, string> = {
+    link: 'Enter a link above and the code appears here.',
+    text: 'Type something above and the code appears here.',
+    wifi: 'Enter the network name above and the code appears here.',
+    contact: 'Enter a name above and the code appears here.',
+    email: 'Enter an address above and the code appears here.',
+    phone: 'Enter a phone number above and the code appears here.',
+    sms: 'Enter a phone number above and the code appears here.',
+  };
+
+  function init(): void {
+    const preview = document.querySelector('#preview');
+    const note = document.querySelector('#readout-note');
+    const error = document.querySelector('#error');
+    const linkUrl = document.querySelector('#link-url');
+    const linkHint = document.querySelector('#link-hint');
+    const textBody = document.querySelector('#text-body');
+    const wifiSsid = document.querySelector('#wifi-ssid');
+    const wifiPassword = document.querySelector('#wifi-password');
+    const wifiSecurity = document.querySelector('#wifi-security');
+    const wifiShow = document.querySelector('#wifi-show');
+    const contactName = document.querySelector('#contact-name');
+    const contactPhone = document.querySelector('#contact-phone');
+    const contactEmail = document.querySelector('#contact-email');
+    const contactOrg = document.querySelector('#contact-org');
+    const contactUrl = document.querySelector('#contact-url');
+    const emailTo = document.querySelector('#email-to');
+    const emailSubject = document.querySelector('#email-subject');
+    const emailBody = document.querySelector('#email-body');
+    const phoneNumber = document.querySelector('#phone-number');
+    const smsNumber = document.querySelector('#sms-number');
+    const smsBody = document.querySelector('#sms-body');
+    const encodedDetails = document.querySelector('#encoded-details');
+    const encodedText = document.querySelector('#encoded-text');
+    const encodedSpec = document.querySelector('#encoded-spec');
+    const copyButton = document.querySelector('#copy-image');
+    const downloadPng = document.querySelector('#download-png');
+    const downloadSvg = document.querySelector('#download-svg');
+    const pngSize = document.querySelector('#png-size');
+
+    const required: Array<[string, unknown, typeof HTMLElement]> = [
+      ['#preview', preview, HTMLElement],
+      ['#readout-note', note, HTMLElement],
+      ['#error', error, HTMLElement],
+      ['#link-url', linkUrl, HTMLInputElement],
+      ['#link-hint', linkHint, HTMLElement],
+      ['#text-body', textBody, HTMLTextAreaElement],
+      ['#wifi-ssid', wifiSsid, HTMLInputElement],
+      ['#wifi-password', wifiPassword, HTMLInputElement],
+      ['#wifi-security', wifiSecurity, HTMLSelectElement],
+      ['#wifi-show', wifiShow, HTMLInputElement],
+      ['#contact-name', contactName, HTMLInputElement],
+      ['#contact-phone', contactPhone, HTMLInputElement],
+      ['#contact-email', contactEmail, HTMLInputElement],
+      ['#contact-org', contactOrg, HTMLInputElement],
+      ['#contact-url', contactUrl, HTMLInputElement],
+      ['#email-to', emailTo, HTMLInputElement],
+      ['#email-subject', emailSubject, HTMLInputElement],
+      ['#email-body', emailBody, HTMLTextAreaElement],
+      ['#phone-number', phoneNumber, HTMLInputElement],
+      ['#sms-number', smsNumber, HTMLInputElement],
+      ['#sms-body', smsBody, HTMLTextAreaElement],
+      ['#encoded-details', encodedDetails, HTMLDetailsElement],
+      ['#encoded-text', encodedText, HTMLElement],
+      ['#encoded-spec', encodedSpec, HTMLElement],
+      ['#copy-image', copyButton, HTMLButtonElement],
+      ['#download-png', downloadPng, HTMLButtonElement],
+      ['#download-svg', downloadSvg, HTMLButtonElement],
+      ['#png-size', pngSize, HTMLSelectElement],
+    ];
+    for (const [selector, element, ctor] of required) {
+      if (!(element instanceof ctor)) throw new Error(`qr-code: ${selector} not found`);
+    }
+
+    // 守卫后的收窄不会保留进嵌套函数，统一经由 view 访问（与既有工具页同一约定）。
+    const view = {
+      preview: preview as HTMLElement,
+      note: note as HTMLElement,
+      error: error as HTMLElement,
+      linkUrl: linkUrl as HTMLInputElement,
+      linkHint: linkHint as HTMLElement,
+      textBody: textBody as HTMLTextAreaElement,
+      wifiSsid: wifiSsid as HTMLInputElement,
+      wifiPassword: wifiPassword as HTMLInputElement,
+      wifiSecurity: wifiSecurity as HTMLSelectElement,
+      wifiShow: wifiShow as HTMLInputElement,
+      contactName: contactName as HTMLInputElement,
+      contactPhone: contactPhone as HTMLInputElement,
+      contactEmail: contactEmail as HTMLInputElement,
+      contactOrg: contactOrg as HTMLInputElement,
+      contactUrl: contactUrl as HTMLInputElement,
+      emailTo: emailTo as HTMLInputElement,
+      emailSubject: emailSubject as HTMLInputElement,
+      emailBody: emailBody as HTMLTextAreaElement,
+      phoneNumber: phoneNumber as HTMLInputElement,
+      smsNumber: smsNumber as HTMLInputElement,
+      smsBody: smsBody as HTMLTextAreaElement,
+      encodedDetails: encodedDetails as HTMLDetailsElement,
+      encodedText: encodedText as HTMLElement,
+      encodedSpec: encodedSpec as HTMLElement,
+      copyButton: copyButton as HTMLButtonElement,
+      downloadPng: downloadPng as HTMLButtonElement,
+      downloadSvg: downloadSvg as HTMLButtonElement,
+      pngSize: pngSize as HTMLSelectElement,
+    };
+
+    let lastMatrix: QrMatrix | null = null;
+    let copyResetTimer = 0;
+
+    const currentType = (): QrType => {
+      const checked = document.querySelector<HTMLInputElement>('input[name="qr-type"]:checked');
+      return (checked?.value as QrType | undefined) ?? 'link';
+    };
+
+    const currentColor = (): string => {
+      const checked = document.querySelector<HTMLInputElement>('input[name="qr-color"]:checked');
+      return COLORS[checked?.value ?? 'black'] ?? COLORS.black!;
+    };
+
+    function currentPayload(): string | null {
+      switch (currentType()) {
+        case 'link':
+          return buildLinkPayload(view.linkUrl.value);
+        case 'text':
+          return buildTextPayload(view.textBody.value);
+        case 'wifi':
+          return buildWifiPayload({
+            ssid: view.wifiSsid.value,
+            password: view.wifiPassword.value,
+            encryption: (view.wifiSecurity.value as WifiInput['encryption']) ?? 'wpa',
+          });
+        case 'contact':
+          return buildVCardPayload({
+            name: view.contactName.value,
+            phone: view.contactPhone.value,
+            email: view.contactEmail.value,
+            org: view.contactOrg.value,
+            url: view.contactUrl.value,
+          });
+        case 'email':
+          return buildEmailPayload({
+            to: view.emailTo.value,
+            subject: view.emailSubject.value,
+            body: view.emailBody.value,
+          });
+        case 'phone':
+          return buildPhonePayload(view.phoneNumber.value);
+        case 'sms':
+          return buildSmsPayload({ number: view.smsNumber.value, body: view.smsBody.value });
+      }
+    }
+
+    /** 空状态：邀请，不是墓碑（AC-018）。 */
+    function showEmpty(type: QrType): void {
+      lastMatrix = null;
+      view.preview.hidden = true;
+      view.preview.textContent = '';
+      view.encodedDetails.hidden = true;
+      view.encodedText.textContent = '';
+      view.encodedSpec.textContent = '';
+      view.error.textContent = '';
+      view.note.hidden = false;
+      view.note.textContent = PROMPTS[type];
+      view.copyButton.disabled = true;
+      view.downloadPng.disabled = true;
+      view.downloadSvg.disabled = true;
+    }
+
+    function render(): void {
+      const type = currentType();
+      const payload = currentPayload();
+
+      if (payload === null) {
+        showEmpty(type);
+        if (type === 'link') view.linkHint.textContent = '';
+        return;
+      }
+
+      const result = generateQr(payload);
+      if (result === null) {
+        // AC-019：明确说上限，绝不静默截断。
+        lastMatrix = null;
+        view.preview.hidden = true;
+        view.preview.textContent = '';
+        view.encodedDetails.hidden = true;
+        view.note.hidden = true;
+        view.error.textContent = `That is too long to fit in a QR code. The limit is about ${capacityBytes(40)} characters, and fewer if you use emoji or other non-English text.`;
+        view.copyButton.disabled = true;
+        view.downloadPng.disabled = true;
+        view.downloadSvg.disabled = true;
+        return;
+      }
+
+      lastMatrix = result.matrix;
+      const spec = describeMatrix(result.matrix);
+
+      view.preview.innerHTML = matrixToSvg(result.matrix, {
+        fg: currentColor(),
+        bg: '#FFFFFF',
+        px: 320,
+      });
+      view.preview.hidden = false;
+      view.note.hidden = true;
+      view.error.textContent = '';
+      view.encodedDetails.hidden = false;
+      view.encodedText.textContent = payload;
+      view.encodedSpec.textContent = `Version ${spec.version} · ${spec.moduleCount} × ${spec.moduleCount} modules · Error correction ${spec.ecl}`;
+      view.copyButton.disabled = false;
+      view.downloadPng.disabled = false;
+      view.downloadSvg.disabled = false;
+
+      // AC-004：只在真的补了协议头时说明，不制造噪音。
+      const raw = view.linkUrl.value.trim();
+      view.linkHint.textContent =
+        type === 'link' && raw !== '' && payload !== raw ? `Using ${payload}` : '';
+    }
+
+    /** 离屏画一张导出用的画布（AC-014）。 */
+    function exportCanvas(targetPx: number): HTMLCanvasElement | null {
+      if (!lastMatrix) return null;
+      const matrix: QrMatrix = lastMatrix;
+      const layout = qrCanvasLayout(matrix.size, targetPx);
+      const canvas = document.createElement('canvas');
+      canvas.width = layout.sidePx;
+      canvas.height = layout.sidePx;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      renderQrCanvas(ctx, matrix, {
+        fg: currentColor(),
+        bg: '#FFFFFF',
+        modulePx: layout.modulePx,
+        sidePx: layout.sidePx,
+        offsetX: layout.offsetX,
+        offsetY: layout.offsetY,
+        labelBaselineY: layout.labelBaselineY,
+      });
+      return canvas;
+    }
+
+    function fileName(extension: string): string {
+      return `qrcode-${currentType()}.${extension}`;
+    }
+
+    function saveBlob(blob: Blob, name: string): void {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function resetCopyLabelLater(): void {
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        view.copyButton.textContent = 'Copy image';
+      }, 2000);
+    }
+
+    // ── 输入即时生成（AC-003）：没有「生成」按钮 ─────────────────────
+    for (const input of document.querySelectorAll(
+      '.type-panel input, .type-panel textarea, .type-panel select',
+    )) {
+      input.addEventListener('input', render);
+      input.addEventListener('change', render);
+    }
+    for (const radio of document.querySelectorAll(
+      'input[name="qr-type"], input[name="qr-color"]',
+    )) {
+      radio.addEventListener('change', render);
+    }
+
+    // AC-007：Wi-Fi 密码默认密文，可切换显示
+    view.wifiShow.addEventListener('change', () => {
+      view.wifiPassword.type = view.wifiShow.checked ? 'text' : 'password';
+    });
+
+    // ── 复制图片（AC-016 / AC-025 不支持时明确降级）──────────────────
+    view.copyButton.addEventListener('click', () => {
+      const canvas = exportCanvas(1024);
+      if (!canvas) return;
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          view.copyButton.textContent = 'Copying failed — use Download PNG';
+          resetCopyLabelLater();
+          return;
+        }
+        try {
+          const item = new ClipboardItem({ 'image/png': blob });
+          navigator.clipboard
+            .write([item])
+            .then(() => {
+              view.copyButton.textContent = 'Image copied';
+            })
+            .catch(() => {
+              view.copyButton.textContent = 'Copying was blocked — use Download PNG';
+            })
+            .finally(resetCopyLabelLater);
+        } catch {
+          // ClipboardItem 不存在（旧浏览器 / 非安全上下文）：明确说改用下载
+          view.copyButton.textContent = 'Copying is not available — use Download PNG';
+          resetCopyLabelLater();
+        }
+      }, 'image/png');
+    });
+
+    view.downloadPng.addEventListener('click', () => {
+      const canvas = exportCanvas(Number(view.pngSize.value));
+      if (!canvas) return;
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          view.downloadPng.textContent = 'Export failed — try again';
+          return;
+        }
+        saveBlob(blob, fileName('png'));
+      }, 'image/png');
+    });
+
+    view.downloadSvg.addEventListener('click', () => {
+      if (!lastMatrix) return;
+      const matrix: QrMatrix = lastMatrix;
+      const svg = matrixToSvg(matrix, { fg: currentColor(), bg: '#FFFFFF', px: 1024 });
+      saveBlob(new Blob([svg], { type: 'image/svg+xml' }), fileName('svg'));
+    });
+
+    // 空状态预填示例（AC-001）：打开即看到一张码
+    view.linkUrl.value = 'https://plainkit.app';
+    render();
+  }
+
+  // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
+  try {
+    init();
+  } catch {
+    // 页面无 JS 时本来就完整可读（渐进增强），这里保持静默
+  }
+</script>
+
+<style>
+  /* 类型标签：input 在 label 之前，这样能用兄弟选择器同时控制标签样式
+     和面板显隐——纯 CSS，无 JS 也能切换（AC-002 / AC-032）。 */
+  .type-switch__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .type-switch__option {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition:
+      border-color var(--dur-state) var(--ease-out),
+      background-color var(--dur-state) var(--ease-out);
+  }
+
+  .type-switch__option:hover {
+    border-color: var(--ink-faint);
+  }
+
+  .type-switch__input:checked + .type-switch__option {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .type-switch__input:focus-visible + .type-switch__option {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .type-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .type-panels {
+    flex-basis: 100%;
+    margin-top: var(--space-4);
+  }
+
+  .type-panel {
+    display: none;
+  }
+
+  #t-link:checked ~ .type-panels #panel-link,
+  #t-text:checked ~ .type-panels #panel-text,
+  #t-wifi:checked ~ .type-panels #panel-wifi,
+  #t-contact:checked ~ .type-panels #panel-contact,
+  #t-email:checked ~ .type-panels #panel-email,
+  #t-phone:checked ~ .type-panels #panel-phone,
+  #t-sms:checked ~ .type-panels #panel-sms {
+    display: block;
+  }
+
+  .field {
+    display: block;
+    margin-bottom: var(--space-4);
+  }
+
+  .field__label {
+    display: block;
+    margin-bottom: var(--space-2);
+    font-size: var(--text-label);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    color: var(--ink-muted);
+  }
+
+  .field__hint {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+  }
+
+  .bench__input--area {
+    width: 100%;
+    min-height: 88px;
+    resize: vertical;
+    font-family: inherit;
+  }
+
+  .bench__input--compact {
+    width: auto;
+    padding-block: var(--space-1);
+  }
+
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    font-size: var(--text-base);
+    cursor: pointer;
+  }
+
+  .check input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+  }
+
+  .swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    cursor: pointer;
+    font-size: var(--text-sm);
+  }
+
+  .swatch__dot {
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line-strong);
+  }
+
+  /* 四种预设深色：都用 class 而不是内联 style——CSP 是 style-src 'self'，
+     内联样式会被浏览器拦掉（scripts/check-budget.mjs 会在构建期抓到）。 */
+  .swatch__dot--black {
+    background: #16191a;
+  }
+
+  .swatch__dot--navy {
+    background: #16325c;
+  }
+
+  .swatch__dot--forest {
+    background: #14532d;
+  }
+
+  .swatch__dot--maroon {
+    background: #6b2537;
+  }
+
+  .swatch input:checked + .swatch__dot {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .qr-preview {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-4);
+  }
+
+  .qr-preview :global(svg) {
+    width: min(320px, 100%);
+    height: auto;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+  }
+
+  .encoded {
+    margin-top: var(--space-4);
+    text-align: left;
+  }
+
+  .encoded__summary {
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+    cursor: pointer;
+  }
+
+  .encoded__body {
+    margin: var(--space-2) 0 0;
+    padding: var(--space-3);
+    max-height: 180px;
+    overflow: auto;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: var(--leading-normal);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .encoded__spec {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .action-size {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+  }
+
+  .link-btn {
+    border: 0;
+    padding: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+</style>

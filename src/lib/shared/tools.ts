@@ -51,6 +51,12 @@ export const TOOLS: readonly ToolEntry[] = [
     summary: 'Turn a picture into ASCII character art — copy the text or download a PNG.',
     category: 'Fun',
   },
+  {
+    slug: 'qr-code',
+    title: 'QR code generator',
+    summary: 'Turn a link, Wi-Fi password or contact into a QR code you can print or share.',
+    category: 'Utility',
+  },
 ];
 
 /** 生成工具页的站内路径（目录式，带尾斜杠，已带部署基路径）。 */
