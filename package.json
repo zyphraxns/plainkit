@@ -23,8 +23,10 @@
     "@astrojs/check": "^0.9.10",
     "@types/node": "^26.6.2",
     "astro": "^7.3.3",
+    "jsqr": "^1.4.0",
     "prettier": "^3.9.8",
     "prettier-plugin-astro": "^1.0.1",
+    "qrcode-generator": "^2.0.4",
     "typescript": "^6.0.3",
     "vitest": "^5.0.1"
   }
