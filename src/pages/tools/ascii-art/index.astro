@@ -1,0 +1,522 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const pageTitle = 'Image to ASCII art';
+const description =
+  'Turn any image into ASCII character art in your browser. Adjust density and charset, copy the text or download a PNG. Free, no ads, nothing leaves your device.';
+const summary = 'Turn a picture into ASCII character art — copy the text or download a PNG.';
+---
+
+<BaseLayout title={pageTitle} description={description} tool="ascii-art">
+  <article class="tool" id="tool">
+    <header class="tool__head">
+      <p class="eyebrow">Creativity</p>
+      <h1 class="tool__title">{pageTitle}</h1>
+      <p class="tool__lead">{summary}</p>
+    </header>
+
+    <section class="bench">
+      <div class="bench__rule" aria-hidden="true"></div>
+
+      <div class="bench__fields">
+        <div class="bench__field">
+          <span class="bench__label" id="source-label">
+            Image
+          </span>
+          <div class="dropzone" id="dropzone" data-state="empty">
+            <p class="dropzone__text" id="dropzone-text">
+              Choose a picture, drag one here, or paste a screenshot (Ctrl / Cmd + V).
+            </p>
+            <input
+              class="dropzone__input"
+              id="file"
+              name="file"
+              type="file"
+              accept="image/*"
+              aria-describedby="load-error"
+            />
+            <button type="button" class="link-btn" id="sample">
+              Try a sample image
+            </button>
+          </div>
+          <p class="bench__error" id="load-error" role="status"></p>
+        </div>
+
+        <div class="bench__field">
+          <label class="bench__label" for="density">
+            Density{' '}
+            <span class="bench__label-hint" id="density-value">
+              100 columns
+            </span>
+          </label>
+          <input
+            class="bench__input bench__input--range"
+            id="density"
+            name="density"
+            type="range"
+            min="40"
+            max="200"
+            step="2"
+            value="100"
+          />
+        </div>
+
+        <div class="bench__field">
+          <span class="bench__label" id="charset-label">
+            Character set
+          </span>
+          <div class="mode-switch" role="radiogroup" aria-labelledby="charset-label">
+            <label class="mode-switch__option">
+              <input type="radio" name="charset" value="classic" checked />
+              <span>Classic</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="charset" value="blocky" />
+              <span>Blocks</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="charset" value="minimal" />
+              <span>Minimal</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="bench__field bench__field--inline">
+          <label class="check">
+            <input type="checkbox" id="invert" />
+            <span>Invert (flip light and dark)</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="color" />
+            <span>Color (preview and PNG only)</span>
+          </label>
+        </div>
+      </div>
+
+      <output class="readout" id="readout" data-state="pending" aria-live="polite">
+        <p class="readout__label">Result</p>
+        <div class="ascii-wrap" id="ascii-wrap" hidden>
+          <canvas class="ascii-canvas" id="preview" width="0" height="0"></canvas>
+        </div>
+        <p class="readout__note" id="readout-note">
+          Load an image above to see its ASCII art. Nothing is uploaded — everything happens on your
+          device.
+        </p>
+      </output>
+
+      <div class="tool__actions">
+        <button type="button" class="btn" data-variant="primary" id="copy-text" disabled>
+          Copy text
+        </button>
+        <button type="button" class="btn" id="download-image" disabled>
+          Download PNG
+        </button>
+      </div>
+    </section>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">How it works</h2>
+      <p class="tool__notes-body">
+        Each cell of a grid over your picture is averaged to a brightness value, then mapped to a
+        character from dark to light. Density sets how many columns the grid has — more columns mean
+        more detail. Invert is useful for dark pictures or dark chat backgrounds.
+      </p>
+
+      <h2 class="tool__notes-title">Sharing</h2>
+      <p class="tool__notes-body">
+        Copy text gives you plain characters that line up in any monospace setting. Download PNG
+        renders the art with a fixed-width font so it never falls apart in chats, and puts a small
+        plainkit.app mark in the corner.
+      </p>
+
+      <h2 class="tool__notes-title">Private by default</h2>
+      <p class="tool__notes-body">
+        Your picture never leaves your device — there is no server to send it to. Color is only for
+        the preview and the PNG, because plain text has no color.
+      </p>
+    </section>
+  </article>
+</BaseLayout>
+
+<script>
+  import { href } from '@/lib/shared/paths';
+  import {
+    CHARSETS,
+    buildPlainText,
+    cellsToColorArt,
+    cellsToText,
+    computeAsciiCanvasLayout,
+    poolCells,
+    renderAsciiCanvas,
+    rowsFor,
+  } from '@/lib/tools/ascii-art';
+  import type { AsciiArt, CharsetPreset } from '@/lib/tools/ascii-art';
+
+  const PREVIEW_CELL_PX = 8;
+  const EXPORT_CELL_PX = 12;
+
+  function init(): void {
+    const dropzone = document.querySelector('#dropzone');
+    const dropzoneText = document.querySelector('#dropzone-text');
+    const fileInput = document.querySelector('#file');
+    const sampleButton = document.querySelector('#sample');
+    const loadError = document.querySelector('#load-error');
+    const density = document.querySelector('#density');
+    const densityValue = document.querySelector('#density-value');
+    const invertBox = document.querySelector('#invert');
+    const colorBox = document.querySelector('#color');
+    const readout = document.querySelector('#readout');
+    const asciiWrap = document.querySelector('#ascii-wrap');
+    const preview = document.querySelector('#preview');
+    const readoutNote = document.querySelector('#readout-note');
+    const copyButton = document.querySelector('#copy-text');
+    const downloadButton = document.querySelector('#download-image');
+
+    if (
+      !(dropzone instanceof HTMLElement) ||
+      !(dropzoneText instanceof HTMLElement) ||
+      !(fileInput instanceof HTMLInputElement) ||
+      !(sampleButton instanceof HTMLButtonElement) ||
+      !(loadError instanceof HTMLElement) ||
+      !(density instanceof HTMLInputElement) ||
+      !(densityValue instanceof HTMLElement) ||
+      !(invertBox instanceof HTMLInputElement) ||
+      !(colorBox instanceof HTMLInputElement) ||
+      !(readout instanceof HTMLElement) ||
+      !(asciiWrap instanceof HTMLElement) ||
+      !(preview instanceof HTMLCanvasElement) ||
+      !(readoutNote instanceof HTMLElement) ||
+      !(copyButton instanceof HTMLButtonElement) ||
+      !(downloadButton instanceof HTMLButtonElement)
+    ) {
+      throw new Error('ascii-art: required elements not found');
+    }
+
+    // 元素守卫后的收窄不会保留进嵌套函数，统一经由 view 访问
+    // （与 random-picker 页面同一约定）。
+    const view = {
+      dropzone,
+      dropzoneText,
+      fileInput,
+      loadError,
+      density,
+      densityValue,
+      invertBox,
+      colorBox,
+      readout,
+      asciiWrap,
+      preview,
+      readoutNote,
+      copyButton,
+      downloadButton,
+    };
+
+    let srcImage: HTMLImageElement | null = null;
+    let lastArt: AsciiArt | null = null;
+    let lastText = '';
+    let copyResetTimer = 0;
+
+    const currentCharset = (): CharsetPreset => {
+      const checked = document.querySelector<HTMLInputElement>('input[name="charset"]:checked');
+      return (checked?.value as CharsetPreset | undefined) ?? 'classic';
+    };
+
+    /** 亮度 → 字符 → 画布：预览与导出走同一条绘制路径（AC-006）。 */
+    function render(): void {
+      if (!srcImage) return;
+      const cols = Number(view.density.value);
+      const rows = rowsFor(srcImage.naturalWidth, srcImage.naturalHeight, cols);
+
+      // 2 倍超采样小画布：drawImage 顺带完成降采样（AC-014），
+      // 白色底一次性完成透明合成（AC-011）。
+      const sw = cols * 2;
+      const sh = rows * 2;
+      const off = document.createElement('canvas');
+      off.width = sw;
+      off.height = sh;
+      const offCtx = off.getContext('2d');
+      if (!offCtx) return;
+      offCtx.fillStyle = '#FFFFFF';
+      offCtx.fillRect(0, 0, sw, sh);
+      offCtx.drawImage(srcImage, 0, 0, sw, sh);
+      const imageData = offCtx.getImageData(0, 0, sw, sh);
+
+      const cells = poolCells(imageData.data, sw, cols, rows);
+      const charset = CHARSETS[currentCharset()];
+      const inverted = view.invertBox.checked;
+      lastArt = { cols, rows, cells: cellsToColorArt(cells, charset, inverted) };
+      lastText = buildPlainText(cellsToText(cells, cols, charset, inverted));
+
+      drawCanvas(view.preview, PREVIEW_CELL_PX);
+      view.asciiWrap.hidden = false;
+      view.readoutNote.hidden = true;
+      view.readout.dataset.state = 'ok';
+      view.copyButton.disabled = false;
+      view.downloadButton.disabled = false;
+    }
+
+    function drawCanvas(canvas: HTMLCanvasElement, cellPx: number): void {
+      if (!lastArt) return;
+      const layout = computeAsciiCanvasLayout(lastArt.cols, lastArt.rows, cellPx);
+      canvas.width = layout.width;
+      canvas.height = layout.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      renderAsciiCanvas(ctx, lastArt, { cellPx, colorMode: view.colorBox.checked });
+    }
+
+    /** 载入一个 File：失败给出可读错误，已有结果不被破坏（AC-009 / 010）。 */
+    function loadFile(file: File): void {
+      if (!file.type.startsWith('image/')) {
+        showLoadError('That file is not an image. Choose a JPG, PNG or WebP picture.');
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      loadImage(url, () => URL.revokeObjectURL(url));
+    }
+
+    function loadImage(src: string, cleanup?: () => void): void {
+      const img = new Image();
+      img.onload = () => {
+        cleanup?.();
+        srcImage = img;
+        view.loadError.textContent = '';
+        view.dropzone.dataset.state = 'loaded';
+        view.dropzoneText.textContent = 'Loaded. Choose another picture, drag one here, or paste.';
+        render();
+      };
+      img.onerror = () => {
+        cleanup?.();
+        showLoadError('This format cannot be decoded in the browser. Use a JPG, PNG or WebP.');
+      };
+      img.src = src;
+    }
+
+    function showLoadError(message: string): void {
+      view.loadError.textContent = message;
+    }
+
+    // ── 三合一输入（AC-002）──────────────────────────────────────────
+    view.fileInput.addEventListener('change', () => {
+      const file = view.fileInput.files?.[0];
+      if (file) loadFile(file);
+      view.fileInput.value = '';
+    });
+
+    for (const eventName of ['dragover', 'dragenter'] as const) {
+      view.dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        view.dropzone.dataset.state = 'dragover';
+      });
+    }
+    for (const eventName of ['dragleave', 'drop'] as const) {
+      view.dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        view.dropzone.dataset.state = srcImage ? 'loaded' : 'empty';
+      });
+    }
+    view.dropzone.addEventListener('drop', (event) => {
+      const file = event.dataTransfer?.files[0];
+      if (file) loadFile(file);
+    });
+
+    window.addEventListener('paste', (event) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            loadFile(file);
+            return;
+          }
+        }
+      }
+    });
+
+    // ── 示例图（AC-001）：点击时才加载，不占首屏请求 ─────────────────
+    document.querySelector('#sample')?.addEventListener('click', () => {
+      loadImage(href('ascii-sample.svg'));
+    });
+
+    // ── 四项参数即时刷新（AC-003 / 004 / 005 / 006）──────────────────
+    view.density.addEventListener('input', () => {
+      view.densityValue.textContent = `${view.density.value} columns`;
+      render();
+    });
+    for (const radio of document.querySelectorAll('input[name="charset"]')) {
+      radio.addEventListener('change', () => {
+        render();
+      });
+    }
+    view.invertBox.addEventListener('change', render);
+    view.colorBox.addEventListener('change', render);
+
+    // ── 复制文本（AC-007）：恒单色，无站点尾巴 ───────────────────────
+    function resetCopyLabelLater(): void {
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        view.copyButton.textContent = 'Copy text';
+      }, 2000);
+    }
+
+    view.copyButton.addEventListener('click', () => {
+      if (!lastText) return;
+      const write = navigator.clipboard?.writeText(lastText);
+      if (!write) {
+        view.copyButton.textContent = 'Copying is not available in this browser';
+        resetCopyLabelLater();
+        return;
+      }
+      write
+        .then(() => {
+          view.copyButton.textContent = 'Copied';
+        })
+        .catch(() => {
+          view.copyButton.textContent = 'Copying was blocked';
+        })
+        .finally(resetCopyLabelLater);
+    });
+
+    // ── 导出 PNG（AC-008）：2 倍以上分辨率 + plainkit.app 标识 ───────
+    view.downloadButton.addEventListener('click', () => {
+      if (!lastArt) return;
+      const canvas = document.createElement('canvas');
+      drawCanvas(canvas, EXPORT_CELL_PX);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          view.downloadButton.textContent = 'Export failed — try again';
+          return;
+        }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'ascii-art.png';
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }, 'image/png');
+    });
+  }
+
+  // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
+  try {
+    init();
+  } catch {
+    // 页面无 JS 时本来就完整可读（渐进增强），这里保持静默
+  }
+</script>
+
+<style>
+  .bench__label-hint {
+    font-weight: 400;
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .link-btn {
+    border: 0;
+    padding: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  /* 拖放区：空状态是邀请，载入后收敛为一行提示 */
+  .dropzone {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--bg);
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--dur-state) var(--ease-out);
+  }
+
+  .dropzone[data-state='dragover'] {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .dropzone__input {
+    font-size: var(--text-sm);
+  }
+
+  .bench__field--inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+  }
+
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    font-size: var(--text-base);
+    cursor: pointer;
+  }
+
+  .check input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+  }
+
+  .bench__input--range {
+    padding: 0;
+    accent-color: var(--accent);
+  }
+
+  /* 字符集切换：与随机分组工具的模式切换同一套视觉 */
+  .mode-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .mode-switch__option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition:
+      border-color var(--dur-state) var(--ease-out),
+      background-color var(--dur-state) var(--ease-out);
+  }
+
+  .mode-switch__option:hover {
+    border-color: var(--ink-faint);
+  }
+
+  .mode-switch__option:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .mode-switch__option input {
+    accent-color: var(--accent);
+  }
+
+  /* 预览：等比缩放进内容列，白底与导出一致 */
+  .ascii-wrap {
+    width: 100%;
+    text-align: center;
+  }
+
+  .ascii-canvas {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+  }
+</style>

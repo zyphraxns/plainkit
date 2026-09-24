@@ -45,6 +45,12 @@ export const TOOLS: readonly ToolEntry[] = [
     summary: 'Split a list into random groups, draw names, or shuffle the order.',
     category: 'Study',
   },
+  {
+    slug: 'ascii-art',
+    title: 'Image to ASCII art',
+    summary: 'Turn a picture into ASCII character art — copy the text or download a PNG.',
+    category: 'Fun',
+  },
 ];
 
 /** 生成工具页的站内路径（目录式，带尾斜杠，已带部署基路径）。 */
