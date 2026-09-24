@@ -39,6 +39,12 @@ export const TOOLS: readonly ToolEntry[] = [
     summary: 'Count days, weeks and weekdays between two dates, with milestone reminders.',
     category: 'Life',
   },
+  {
+    slug: 'random-picker',
+    title: 'Random group & name picker',
+    summary: 'Split a list into random groups, draw names, or shuffle the order.',
+    category: 'Study',
+  },
 ];
 
 /** 生成工具页的站内路径（目录式，带尾斜杠，已带部署基路径）。 */
