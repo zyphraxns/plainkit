@@ -210,7 +210,17 @@ for (const htmlFile of htmlFiles) {
 //   JS   —— 任何绝对 URL 都值得看一眼（JS 里的 URL 极可能就是网络目标）
 
 const SCANNED_EXTENSIONS = new Set(['.html', '.css', '.js']);
-const URL_RE = /https?:\/\/[^\s"'<>()\\]+/g;
+// 反引号也要一并排除：模板字符串里的 `https://${host}` 不是写死的请求目标。
+const URL_RE = /https?:\/\/[^\s"'`<>()\\]+/g;
+
+/**
+ * 主机名必须长得像域名才算外部请求。
+ *
+ * 模板字符串（`https://${host}`）和正则误吞进来的代码碎片（如 `plainkit.app`,Y）
+ * 会被 URL 解析成畸形主机名。它们不产生任何网络请求，不该让构建失败——
+ * 一个天天误报的门禁最终会被关掉，而那比没有门禁更糟。
+ */
+const HOSTNAME_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9-]+)+$/;
 
 function requestUrlsIn(file, text) {
   const urls = [];
@@ -247,7 +257,7 @@ for (const file of distFiles) {
     } catch {
       continue;
     }
-    if (ALLOWED_HOSTS.has(host) || host === 'localhost') continue;
+    if (ALLOWED_HOSTS.has(host) || host === 'localhost' || !HOSTNAME_RE.test(host)) continue;
     fail(
       `${relative(DIST, file)} 引用了外部域名 ${host}。` +
         `全站外部请求数必须为 0。如果它不产生网络请求，把它加进本脚本的 ALLOWED_HOSTS 并说明原因。`,
