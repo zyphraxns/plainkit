@@ -146,7 +146,7 @@ export function buildPlainText(lines: string[]): string {
 // PNG 导出（AC-008）
 // ---------------------------------------------------------------------------
 
-/** 画布内边距与页脚高度（页脚放 plainkit.app 标识）。 */
+/** 画布内边距与页脚高度（页脚放 PlainKit 标识）。 */
 const CANVAS_MARGIN = 32;
 const CANVAS_FOOTER = 64;
 
@@ -194,7 +194,7 @@ export interface AsciiCanvasOptions {
 }
 
 /**
- * 在画布上绘制 ASCII 字符画，白底深字、右下角 plainkit.app 标识。
+ * 在画布上绘制 ASCII 字符画，白底深字、右下角 PlainKit 标识。
  *
  * 颜色值与卡片主题（canvas-card 的 CARD_THEMES.light）保持同一套：
  * ink #16191A、muted #5A6360。调用方负责创建画布（尺寸来自
@@ -237,7 +237,7 @@ export function renderAsciiCanvas(
   ctx.fillStyle = '#5A6360';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('plainkit.app', layout.width - layout.margin, layout.height - layout.margin + 10);
+  ctx.fillText('PlainKit', layout.width - layout.margin, layout.height - layout.margin + 10);
 
   ctx.restore();
 }

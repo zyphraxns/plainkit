@@ -57,7 +57,7 @@ function decode(text: string, mask?: number): string | null {
 
 describe('端到端：jsQR 解码自研生成的码', () => {
   const payloads: Array<[name: string, text: string]> = [
-    ['链接', buildLinkPayload('plainkit.app')!],
+    ['链接', buildLinkPayload('example.com')!],
     ['文本', buildTextPayload('meet me at the library at 6')!],
     [
       'Wi-Fi（含特殊字符）',
@@ -90,7 +90,7 @@ describe('端到端：jsQR 解码自研生成的码', () => {
   });
 
   it('all eight masks stay scannable', () => {
-    const text = 'https://plainkit.app';
+    const text = 'https://zyphraxns.github.io/plainkit/';
     for (let mask = 0; mask < 8; mask += 1) {
       expect(decode(text, mask)).toBe(text);
     }

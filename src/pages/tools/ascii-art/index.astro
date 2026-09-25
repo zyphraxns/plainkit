@@ -126,7 +126,7 @@ const summary = 'Turn a picture into ASCII character art — copy the text or do
       <p class="tool__notes-body">
         Copy text gives you plain characters that line up in any monospace setting. Download PNG
         renders the art with a fixed-width font so it never falls apart in chats, and puts a small
-        plainkit.app mark in the corner.
+        PlainKit mark in the corner.
       </p>
 
       <h2 class="tool__notes-title">Private by default</h2>
@@ -378,7 +378,7 @@ const summary = 'Turn a picture into ASCII character art — copy the text or do
         .finally(resetCopyLabelLater);
     });
 
-    // ── 导出 PNG（AC-008）：2 倍以上分辨率 + plainkit.app 标识 ───────
+    // ── 导出 PNG（AC-008）：2 倍以上分辨率 + PlainKit 标识 ───────
     view.downloadButton.addEventListener('click', () => {
       if (!lastArt) return;
       const canvas = document.createElement('canvas');

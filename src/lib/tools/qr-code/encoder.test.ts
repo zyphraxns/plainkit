@@ -67,7 +67,9 @@ describe('chooseVersion / capacityBytes', () => {
   });
 
   it('AC-029: 短内容落在小版本', () => {
-    expect(chooseVersion(utf8Bytes('https://plainkit.app').length)).toBeLessThan(6);
+    expect(chooseVersion(utf8Bytes('https://zyphraxns.github.io/plainkit/').length)).toBeLessThan(
+      6,
+    );
   });
 });
 
@@ -131,7 +133,7 @@ describe('rsEncode', () => {
 
 describe('buildMatrix — 与成熟实现逐模块比对', () => {
   const payloads: Array<[name: string, text: string]> = [
-    ['链接', 'https://plainkit.app'],
+    ['链接', 'https://zyphraxns.github.io/plainkit/'],
     ['英文', 'HELLO WORLD'],
     ['Wi-Fi', 'WIFI:T:WPA;S:Cafe\\;1;P:a\\:b\\\\c\\,d\\"e;;'],
     ['名片', 'BEGIN:VCARD\nVERSION:3.0\nFN:Ada\nTEL:+49301\nEND:VCARD'],
@@ -171,15 +173,15 @@ describe('buildMatrix — 与成熟实现逐模块比对', () => {
 
 describe('generateQr', () => {
   it('AC-029: is deterministic — the same text always yields the same matrix', () => {
-    const first = generateQr('https://plainkit.app');
-    const second = generateQr('https://plainkit.app');
+    const first = generateQr('https://zyphraxns.github.io/plainkit/');
+    const second = generateQr('https://zyphraxns.github.io/plainkit/');
     expect(first).not.toBeNull();
     expect(second).not.toBeNull();
     expect(Array.from(second!.matrix.modules)).toEqual(Array.from(first!.matrix.modules));
   });
 
   it('AC-013: describes version, module count and error correction level', () => {
-    const result = generateQr('https://plainkit.app');
+    const result = generateQr('https://zyphraxns.github.io/plainkit/');
     expect(result).not.toBeNull();
     const info = describeMatrix(result!.matrix);
     expect(info.ecl).toBe('M');

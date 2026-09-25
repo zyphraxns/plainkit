@@ -273,7 +273,7 @@ export function formatShareText(
     weeks > 0 ? ` — that's ${formatNumber(weeks)} weeks and ${remainingDays} days` : '';
   const labelPrefix = label === '' ? '' : `${label}: `;
 
-  return `${labelPrefix}${core}${weeksClause}. plainkit.app`;
+  return `${labelPrefix}${core}${weeksClause}. PlainKit`;
 }
 
 // ── URL 状态编解码（AC-006 / AC-015 / AC-018）────────────────────────

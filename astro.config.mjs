@@ -7,8 +7,9 @@ import { defineConfig } from 'astro/config';
 const base = process.env.BASE_PATH ?? '/';
 
 export default defineConfig({
-  // 正式域名确定后更新这里（见 specs/技术栈.md §13）
-  site: 'https://plainkit.app',
+  // 只用于生成绝对 URL（站内目前没有 canonical / OG / sitemap，占位不构成风险）。
+  // 当前实际访问地址是 GitHub Pages 镜像；正式域名确定后改这一行。
+  site: 'https://zyphraxns.github.io',
   base,
   output: 'static',
   trailingSlash: 'always',

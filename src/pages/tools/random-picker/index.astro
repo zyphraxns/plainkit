@@ -136,7 +136,7 @@ const summary =
       <h2 class="tool__notes-title">Sharing</h2>
       <p class="tool__notes-body">
         Copy text gives you a plain list ready to paste into any chat. Download image saves a PNG
-        card with the results and a small plainkit.app mark in the corner.
+        card with the results and a small PlainKit mark in the corner.
       </p>
 
       <h2 class="tool__notes-title">Private by default</h2>
@@ -489,7 +489,7 @@ const summary =
 
     // ── 复制文本（AC-006）───────────────────────────────────────────────
     function resultText(result: PickerResult): string {
-      const header = `${result.modeLabel} · ${todayLabel()} · plainkit.app`;
+      const header = `${result.modeLabel} · ${todayLabel()} · PlainKit`;
       if (result.groups.length === 1 && result.groups[0]!.label === '') {
         return formatListText(result.members, header);
       }

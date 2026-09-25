@@ -84,7 +84,7 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 }
 
 /**
- * 在 1080×1080 画布上绘制倒计时/纪念日卡片，右下角带 plainkit.app 站点标识。
+ * 在 1080×1080 画布上绘制倒计时/纪念日卡片，右下角带 PlainKit 站点标识。
  *
  * 调用方负责创建画布（含 2 倍分辨率处理）与下载/展示。
  */
@@ -144,7 +144,7 @@ export function drawCountdownCard(ctx: CanvasRenderingContext2D, content: CardCo
   ctx.font = '500 30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   ctx.fillStyle = colors.muted;
   ctx.textAlign = 'right';
-  ctx.fillText('plainkit.app', size - margin, size - margin + 10);
+  ctx.fillText('PlainKit', size - margin, size - margin + 10);
 
   ctx.restore();
 }
@@ -260,7 +260,7 @@ export function computeGroupCardLayout(
 }
 
 /**
- * 在画布上绘制随机分组 / 抽签结果卡片，右下角带 plainkit.app 站点标识。
+ * 在画布上绘制随机分组 / 抽签结果卡片，右下角带 PlainKit 站点标识。
  *
  * 画布宽 1080、高由 computeGroupCardLayout 决定；调用方负责创建画布
  * （含 2 倍分辨率处理）与下载/展示。
@@ -330,7 +330,7 @@ export function drawGroupCard(ctx: CanvasRenderingContext2D, content: GroupCardC
   ctx.font = FONT(30, 500);
   ctx.fillStyle = colors.muted;
   ctx.textAlign = 'right';
-  ctx.fillText('plainkit.app', layout.width - CARD_MARGIN, layout.height - 70);
+  ctx.fillText('PlainKit', layout.width - CARD_MARGIN, layout.height - 70);
 
   ctx.restore();
 }

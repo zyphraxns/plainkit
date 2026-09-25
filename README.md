@@ -8,15 +8,21 @@ work something out.
 
 ## Status
 
-Early development. The site skeleton is in place; the first tools are being built.
+Live at **https://zyphraxns.github.io/plainkit/** (GitHub Pages mirror). Six tools are built;
+more are added on a rolling basis.
 
-Planned for the first release:
+| Tool                       | What it does                                                        |
+| -------------------------- | ------------------------------------------------------------------- |
+| Final grade calculator     | What you need on the final to hit your target grade                 |
+| Countdown card             | Turn a date into a shareable countdown or anniversary card          |
+| Date duration calculator   | Days, weeks and weekdays between two dates, with milestones         |
+| Random group & name picker | Split a list into random groups, draw names, or shuffle the order   |
+| Image to ASCII art         | Turn a picture into ASCII art — copy the text or download a PNG     |
+| QR code generator          | Turn a link, Wi-Fi password or contact into a QR code you can print |
 
-1. Final grade calculator
-2. Countdown / anniversary card
-3. Date duration calculator
-4. Random grouping and drawing
-5. Chemistry tools (equation balancing, molar mass)
+Every tool produces something worth sharing — a card, an image, or a line of text you can send to
+someone. That is the whole design rule: if nobody would ever share the result, the tool does not get
+built.
 
 ## Getting started
 

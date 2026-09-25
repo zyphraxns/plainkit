@@ -22,7 +22,7 @@ export const QUIET_ZONE = 4;
 export const LABEL_UNITS = 4;
 
 /** 可分享产物自带的站点标识（产品概述 §6.1 回流闭环）。 */
-export const SITE_LABEL = 'plainkit.app';
+export const SITE_LABEL = 'PlainKit';
 
 /** 标识的颜色：比前景色浅一档，看得出但不抢戏。 */
 const LABEL_COLOR = '#5A6360';

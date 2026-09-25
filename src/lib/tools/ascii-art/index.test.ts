@@ -172,7 +172,7 @@ describe('computeAsciiCanvasLayout', () => {
     expect(tall.height).toBeGreaterThan(small.height);
   });
 
-  it('AC-008: reserves footer space for the plainkit.app mark', () => {
+  it('AC-008: reserves footer space for the PlainKit mark', () => {
     const layout = computeAsciiCanvasLayout(10, 10, 12);
     // 内容区之外必须还有余量（页脚标识），不能贴边。
     expect(layout.height).toBeGreaterThan(10 * 12 + layout.margin * 2);

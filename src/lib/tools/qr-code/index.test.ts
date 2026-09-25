@@ -28,7 +28,7 @@ const contact = (over: Partial<Parameters<typeof buildVCardPayload>[0]> = {}) =>
 
 describe('buildLinkPayload', () => {
   it('AC-004: adds https:// when the link has no scheme', () => {
-    expect(buildLinkPayload('plainkit.app')).toBe('https://plainkit.app');
+    expect(buildLinkPayload('example.com')).toBe('https://example.com');
   });
 
   it('AC-004: leaves links that already carry http(s):// untouched', () => {
