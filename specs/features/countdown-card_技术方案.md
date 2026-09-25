@@ -24,7 +24,7 @@
 | 函数 | 签名 | 输入输出 |
 |---|---|---|
 | `fitTextSize` | `(text: string, maxWidth: number, startPx: number, minPx: number) => number` | 纯函数：给定字号起点与上限宽度，返回不溢出的字号。可 node 单测 |
-| `drawCountdownCard` | `(ctx: CanvasRenderingContext2D, state: RenderState) => void` | 1080×1080，基于 `measureText` 自适应排版，右下角 `plainkit.app`。DOM 相关，靠 agent-browser 验收 |
+| `drawCountdownCard` | `(ctx: CanvasRenderingContext2D, state: RenderState) => void` | 1080×1080，基于 `measureText` 自适应排版，右下角 `PlainKit`。DOM 相关，靠 agent-browser 验收 |
 
 ### 主题
 

@@ -21,7 +21,7 @@
 | `gridToText` | `(grid: number[], cols: number, charset: string, inverted: boolean) => string[]` | 亮度映射字符：inverted 时先取 `1-lum`；每行去掉行尾空格（不影响等宽对齐） |
 | `gridToColorArt` | `(grid: number[], rgb: number[], cols: number, charset: string, inverted: boolean) => AsciiCell[]` | AsciiCell = `{ char: string; color: string }`（hex），色取块内平均 RGB |
 | `buildPlainText` | `(lines: string[]) => string` | `\n` 连接，去首尾空行（AC-007） |
-| `renderAsciiCanvas` | `(ctx, cells, options) => void` | 等宽字体逐格绘制 + 右下角 `plainkit.app`（BR-002）；单色用 `--ink` 值、白底——**PNG 与预览永远一致**（AC-006 / 008） |
+| `renderAsciiCanvas` | `(ctx, cells, options) => void` | 等宽字体逐格绘制 + 右下角 `PlainKit`（BR-002）；单色用 `--ink` 值、白底——**PNG 与预览永远一致**（AC-006 / 008） |
 
 ## 边界情况处理表
 

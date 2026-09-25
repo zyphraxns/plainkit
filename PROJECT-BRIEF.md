@@ -227,7 +227,7 @@
 **待办**
 
 1. **s7 项目初始化**（建仓库、生成脚手架、配 CI、验证 `npm run build` 能出 `dist/`）— 下一步
-2. 领 `.app` 域名（学生包已有，走 Name.com）
+2. 领 `.app` 域名（学生包已有，走 Name.com）—— **2026-09-25 用户裁定：暂不领。Name.com 要求填信用卡，当前阶段直接用 GitHub Pages（`zyphraxns.github.io/plainkit/`）。** 顺带决定：所有可分享产物的站点标识去掉域名、只留 `PlainKit`（原因见下一条）。原计划里的 `plainkit.app` 已被第三方斯洛伐克语同名站占用，`.dev` 另有一家改名前的同类站（CarefulKit）。等站点验证过「有人愿意用」再买域名，届时只改 `astro.config.mjs` 的 `site` 一行
 3. 建 GitHub 仓库并推送
 4. 审计 r/InternetIsBeautiful 和 r/SideProject 的规则（**发帖前**的 15 分钟动作，不阻塞开发）
 5. 开始做第一个工具（成绩与目标分数计算器）

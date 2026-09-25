@@ -19,7 +19,7 @@
 | `parseLabel(input: string): string` | 任意字符串 → ≤60 字符标签 | trim + 截断 60（BR-004） |
 | `encodeState(state): string` | {start, end, label} → URL query | 沿用 countdown-card 参数风格：`s=YYYY-MM-DD&e=…&l=…` |
 | `decodeState(params): State \| null` | URLSearchParams → State \| null | 任一步失败（缺参/格式错）→ null，调用方回退空表单（AC-015） |
-| `formatShareText(state, result): string` | 状态+结果 → 英文句子 | 有标签含标签，无标签中性措辞；结尾带 plainkit.app |
+| `formatShareText(state, result): string` | 状态+结果 → 英文句子 | 有标签含标签，无标签中性措辞；结尾带 PlainKit |
 
 ## 边界处理表
 

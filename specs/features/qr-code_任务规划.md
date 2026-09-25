@@ -19,7 +19,7 @@
 新建 `src/lib/tools/qr-code/index.ts`，先写 `index.test.ts` 再实现。
 
 **验证标准**（测试名以 `AC-xxx:` 开头）：
-- 链接：输入 `plainkit.app` → `https://plainkit.app`；输入 `http://a.com` → 不变（AC-004）
+- 链接：输入 `PlainKit` → `https://zyphraxns.github.io/plainkit/`；输入 `http://a.com` → 不变（AC-004）
 - Wi-Fi：SSID `Cafe;1` 密码 `a:b\c` → 转义后 `\;` `\:` `\\`，用于生成 `WIFI:T:WPA;S:Cafe\;1;P:a\:b\\c;;`（AC-021）
 - 名片：姓名含 `,` `;` → 正确转义，字段不串位（AC-022）
 - 邮件：只填收件人 → `mailto:a@b.com`，无 `?`；主题正文都填 → 两个参数都在（AC-024）
@@ -55,7 +55,7 @@
 `src/lib/tools/qr-code/render.ts`。
 
 **验证标准**：
-- `matrixToSvg`：静区恒为 4 模块（AC-028）；底部含 `plainkit.app`（AC-017）；前景色随传入值变化、背景恒白（AC-012）
+- `matrixToSvg`：静区恒为 4 模块（AC-028）；底部含 `PlainKit`（AC-017）；前景色随传入值变化、背景恒白（AC-012）
 - `renderQrCanvas`：与 SVG 同色同布局；尺寸随 512 / 1024 变化（AC-014）
 - 两个产物的模块位置一致（预览 = 导出，所见即所得）
 
@@ -65,7 +65,7 @@
 
 **验证标准**：
 - `npm run typecheck`、`npm run build` 通过
-- 打开即显示示例码（`https://plainkit.app`），三个导出按钮可用（AC-001）
+- 打开即显示示例码（`https://zyphraxns.github.io/plainkit/`），三个导出按钮可用（AC-001）
 - 7 个类型标签同时可见、切换后表单跟着变、切回内容仍在（AC-002）
 - 输入即时出码，页面上**没有**「生成」按钮（AC-003）
 - 必填为空 → 不出码 + 引导语 + 导出按钮置灰（AC-018）

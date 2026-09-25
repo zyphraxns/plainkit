@@ -10,7 +10,7 @@
 
 ## 任务 2：Canvas 内核
 
-`src/lib/shared/canvas-card/`：`fitTextSize` 纯函数 + 测试（长文本缩到 minPx、短文本不缩）；`drawCountdownCard` 绘制函数（含 `plainkit.app` 标识）。
+`src/lib/shared/canvas-card/`：`fitTextSize` 纯函数 + 测试（长文本缩到 minPx、短文本不缩）；`drawCountdownCard` 绘制函数（含 `PlainKit` 标识）。
 
 **验证**：`fitTextSize` 测试全绿；绘制函数 typecheck 通过，视觉效果留待任务 5。
 
@@ -22,7 +22,7 @@
 
 ## 任务 4：导出与复制
 
-`Download image`（1080×1080 PNG，右下角 `plainkit.app`）+ `Copy link`（复制当前 URL，含完整域名）+ `Link copied` 反馈。
+`Download image`（1080×1080 PNG，右下角 `PlainKit`）+ `Copy link`（复制当前 URL，含完整域名）+ `Link copied` 反馈。
 
 **验证**：下载的 PNG 可打开、尺寸 1080×1080；复制动作后出现反馈文案。
 

@@ -23,7 +23,7 @@
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `drawGroupCard` | `(ctx, content: GroupCardContent) => void` | 复用 `CARD_THEMES.light` 与 `fitTextSize`。**宽 1080 固定、高按内容增长**（3 栏排版，大名单不截断，AC-013）；右下角 `plainkit.app` 标识 |
+| `drawGroupCard` | `(ctx, content: GroupCardContent) => void` | 复用 `CARD_THEMES.light` 与 `fitTextSize`。**宽 1080 固定、高按内容增长**（3 栏排版，大名单不截断，AC-013）；右下角 `PlainKit` 标识 |
 
 ## 边界情况处理表
 

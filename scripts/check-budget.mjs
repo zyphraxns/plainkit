@@ -33,7 +33,7 @@ const BUDGET = {
 
 /** 允许出现的外部域名。加入任何一项都要先问：它真的不会产生网络请求吗？ */
 const ALLOWED_HOSTS = new Set([
-  'plainkit.app', // 自身域名，出现在 canonical 与 sitemap 里
+  'zyphraxns.github.io', // 自身托管域（GitHub Pages），示例链接里出现
   'www.w3.org', // SVG / XML 命名空间，是标识符不是请求
 ]);
 
@@ -216,7 +216,7 @@ const URL_RE = /https?:\/\/[^\s"'`<>()\\]+/g;
 /**
  * 主机名必须长得像域名才算外部请求。
  *
- * 模板字符串（`https://${host}`）和正则误吞进来的代码碎片（如 `plainkit.app`,Y）
+ * 模板字符串（`https://${host}`）和正则误吞进来的代码碎片（如 `PlainKit`,Y）
  * 会被 URL 解析成畸形主机名。它们不产生任何网络请求，不该让构建失败——
  * 一个天天误报的门禁最终会被关掉，而那比没有门禁更糟。
  */

@@ -151,7 +151,7 @@ import { defineConfig } from 'astro/config';
 const base = process.env.BASE_PATH ?? '/';
 
 export default defineConfig({
-  site: 'https://plainkit.app', // 正式域名确定后更新
+  site: 'https://zyphraxns.github.io/plainkit/', // 正式域名确定后更新
   base,
   output: 'static',
   trailingSlash: 'always',

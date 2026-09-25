@@ -31,7 +31,7 @@
 验证标准：
 - encode → decode 往返一致（AC-006）
 - 缺参、格式错、多余垃圾参数 → decodeState 返回 null（AC-015）
-- 有/无标签两种 shareText 快照断言，均含 plainkit.app（AC-008、AC-009）
+- 有/无标签两种 shareText 快照断言，均含 PlainKit（AC-008、AC-009）
 
 ## [x] T4 — 页面实现
 

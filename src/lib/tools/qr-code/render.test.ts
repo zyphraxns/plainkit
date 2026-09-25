@@ -14,7 +14,7 @@ const FG = '#123456';
 const BG = '#FFFFFF';
 
 function sampleMatrix() {
-  const result = generateQr('https://plainkit.app');
+  const result = generateQr('https://zyphraxns.github.io/plainkit/');
   expect(result).not.toBeNull();
   return result!.matrix;
 }
@@ -70,7 +70,7 @@ describe('matrixToSvg', () => {
     expect(svg).toContain(`fill="${BG}"`);
   });
 
-  it('AC-017: carries the plainkit.app mark below the code', () => {
+  it('AC-017: carries the PlainKit mark below the code', () => {
     expect(svg).toContain(SITE_LABEL);
   });
 
@@ -120,7 +120,7 @@ describe('renderQrCanvas', () => {
     expect(first.y).toBe(QUIET_ZONE * layout.modulePx);
   });
 
-  it('AC-017: draws the plainkit.app mark', () => {
+  it('AC-017: draws the PlainKit mark', () => {
     expect(texts.map((entry) => entry.text)).toContain(SITE_LABEL);
   });
 });

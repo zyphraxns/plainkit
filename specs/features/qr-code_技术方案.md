@@ -48,7 +48,7 @@
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `matrixToSvg` | `(m, { fg, bg, quietZone, label }) => string` | SVG 字符串；`quietZone` 默认 4 模块（BR-003）；底部带 `plainkit.app` 小字（BR-002） |
+| `matrixToSvg` | `(m, { fg, bg, quietZone, label }) => string` | SVG 字符串；`quietZone` 默认 4 模块（BR-003）；底部带 `PlainKit` 小字（BR-002） |
 | `renderQrCanvas` | `(ctx, m, { fg, bg, size, quietZone }) => void` | canvas 绘制 + 底部小字；与 SVG 同源同色（所见即所得） |
 
 > 版本表（每版本总码字数 / 每块纠错码字数 / 分块数）取 ISO/IEC 18004 的 M 级列，落成常量表。**表里 40 行全部由上面的交叉验证测试兜住**——任何一行错，比对就会红。
@@ -73,7 +73,7 @@
 - 预览：把 `matrixToSvg` 的字符串内联进 DOM（清晰、可缩放、与 SVG 导出同源）
 - 导出：PNG → canvas `toBlob` + 下载（512 / 1024 两档，按 2 倍分辨率绘制再缩放）；SVG → `Blob` 直接下载；复制图片 → `ClipboardItem`
 - 颜色：4 个预设深色写成 CSS 变量，预览 SVG 与 canvas 取同一变量值
-- 示例：空状态预填 `https://plainkit.app`（AC-001）
+- 示例：空状态预填 `https://zyphraxns.github.io/plainkit/`（AC-001）
 - 首页登记：`src/lib/shared/tools.ts` 的 `TOOLS` 加条目（分类 `Utility`）
 
 ## 三个记录在案的判断
