@@ -10,8 +10,15 @@ dist/
 .env.local
 .env.*.local
 
-# AI 助手的工作记忆与临时数据。这是本地工作状态，不是项目产物，
-# 不应出现在公开仓库里。项目规格在 specs/，过程记录在 docs/。
+# 本地工作产物，不进公开仓库：
+# 设计规格与验收标准（specs/）、开发与验收记录（docs/）、
+# 决策档案与选品调研（PROJECT-BRIEF.md、everyday-tools-plan.html）、
+# AI 助手的工作记忆（.workbuddy/）。
+# 公开仓库只保留：源码、站点配置、CI、README、LICENSE。
+specs/
+docs/
+PROJECT-BRIEF.md
+everyday-tools-plan.html
 .workbuddy/
 
 # 编辑器 / 系统
