@@ -1,0 +1,459 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const pageTitle = 'Chart maker';
+const description =
+  'Paste two columns of numbers and get a bar, line or pie chart you can download or share. Free, no ads, nothing leaves your device.';
+const summary = 'Paste two columns of numbers, pick a chart, download the picture.';
+---
+
+<BaseLayout title={pageTitle} description={description} tool="chart-maker">
+  <article class="tool" id="tool">
+    <header class="tool__head">
+      <p class="eyebrow">Charts</p>
+      <h1 class="tool__title">{pageTitle}</h1>
+      <p class="tool__lead">{summary}</p>
+    </header>
+
+    <section class="bench">
+      <div class="bench__rule" aria-hidden="true"></div>
+
+      <div class="bench__fields">
+        <div class="bench__field">
+          <label class="bench__label" for="chart-data">
+            Data
+          </label>
+          <textarea
+            class="chart-data"
+            id="chart-data"
+            name="data"
+            rows="7"
+            spellcheck="false"
+            autocomplete="off"
+            aria-describedby="chart-data-error"
+            placeholder={'Jan, 120\nFeb, 180\nMar, 150'}
+          ></textarea>
+          <p class="bench__error" id="chart-data-error"></p>
+          <p class="chart-notice" id="chart-notice" hidden></p>
+        </div>
+
+        <fieldset class="bench__field chart-type">
+          <legend class="bench__label">Chart type</legend>
+          <div class="chart-type__options">
+            <label class="chart-type__option">
+              <input type="radio" name="chart-type" value="bar" checked />
+              <span>Bar</span>
+            </label>
+            <label class="chart-type__option">
+              <input type="radio" name="chart-type" value="line" />
+              <span>Line</span>
+            </label>
+            <label class="chart-type__option">
+              <input type="radio" name="chart-type" value="pie" />
+              <span>Pie</span>
+            </label>
+          </div>
+          <p class="bench__error" id="chart-type-error"></p>
+        </fieldset>
+
+        <div class="bench__field">
+          <label class="bench__label" for="chart-title">
+            Title
+          </label>
+          <input
+            class="bench__input"
+            id="chart-title"
+            name="title"
+            type="text"
+            maxlength="60"
+            autocomplete="off"
+            placeholder="Optional, e.g. Monthly signups"
+            aria-describedby="chart-title-error"
+          />
+          <p class="bench__error" id="chart-title-error"></p>
+        </div>
+      </div>
+
+      <output class="readout" id="readout" data-state="pending" aria-live="polite">
+        <p class="readout__label">Your chart</p>
+        <canvas class="chart-canvas" id="chart-canvas" hidden></canvas>
+        <p class="readout__note" id="readout-note">
+          Paste at least two rows of data to see a chart.
+        </p>
+      </output>
+
+      <div class="tool__actions">
+        <button type="button" class="btn" data-variant="primary" id="copy-link" disabled>
+          Copy link
+        </button>
+        <button type="button" class="btn" id="download-image" disabled>
+          Download image
+        </button>
+      </div>
+      <p class="chart-link-note" id="link-note" hidden>
+        This chart is too big to fit in a link. Download the image instead.
+      </p>
+    </section>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">How this works</h2>
+      <p class="tool__notes-body">
+        Each row is one label and one number, separated by a tab, a comma or a semicolon — copying
+        two columns straight out of a spreadsheet works. A row with just a number gets labelled Row
+        1, Row 2 and so on, and blank rows are skipped. If a row cannot be read, the message under
+        the box tells you which one and why.
+      </p>
+      <p class="tool__notes-body">
+        Bar charts always start at zero, so the height of a bar is the size of its number. Line
+        charts zoom in on the data and show the range on the axis. Pie slices are sorted largest
+        first and labelled with their share; slices under 5% are not labelled because the labels
+        would not fit.
+      </p>
+
+      <h2 class="tool__notes-title">Sharing</h2>
+      <p class="tool__notes-body">
+        Copy link puts the whole chart into the link itself — anyone who opens it sees the same
+        chart, and the data never touches a server. Download image saves a PNG with a small PlainKit
+        mark in the corner.
+      </p>
+    </section>
+  </article>
+</BaseLayout>
+
+<script>
+  import { CHART_TYPES, parseChartData, parseTitle } from '@/lib/tools/chart-maker';
+  import type { ChartState, ChartType } from '@/lib/tools/chart-maker';
+  import { drawChart } from '@/lib/tools/chart-maker/draw';
+  import { formatChartNumber } from '@/lib/tools/chart-maker/layout';
+  import {
+    decodeState,
+    encodeState,
+    summarize,
+    validateForType,
+  } from '@/lib/tools/chart-maker/validate';
+
+  /** 编码后的链接超过这个长度时禁用 Copy link（BR-009）。 */
+  const MAX_LINK_CHARS = 2000;
+
+  function init(): void {
+    const view = {
+      data: document.querySelector('#chart-data') as HTMLTextAreaElement | null,
+      title: document.querySelector('#chart-title') as HTMLInputElement | null,
+      canvas: document.querySelector('#chart-canvas') as HTMLCanvasElement | null,
+      readout: document.querySelector('#readout') as HTMLOutputElement | null,
+      note: document.querySelector('#readout-note') as HTMLParagraphElement | null,
+      notice: document.querySelector('#chart-notice') as HTMLParagraphElement | null,
+      dataError: document.querySelector('#chart-data-error') as HTMLParagraphElement | null,
+      typeError: document.querySelector('#chart-type-error') as HTMLParagraphElement | null,
+      titleError: document.querySelector('#chart-title-error') as HTMLParagraphElement | null,
+      linkNote: document.querySelector('#link-note') as HTMLParagraphElement | null,
+      copyButton: document.querySelector('#copy-link') as HTMLButtonElement | null,
+      downloadButton: document.querySelector('#download-image') as HTMLButtonElement | null,
+      typeRadios: Array.from(
+        document.querySelectorAll<HTMLInputElement>('input[name="chart-type"]'),
+      ),
+    };
+    if (
+      !view.data ||
+      !view.title ||
+      !view.canvas ||
+      !view.readout ||
+      !view.note ||
+      !view.notice ||
+      !view.dataError ||
+      !view.typeError ||
+      !view.titleError ||
+      !view.linkNote ||
+      !view.copyButton ||
+      !view.downloadButton ||
+      view.typeRadios.length === 0
+    ) {
+      return;
+    }
+
+    let lastState: ChartState | null = null;
+
+    function setError(element: HTMLElement, errorElement: HTMLElement, message: string): void {
+      errorElement.textContent = message;
+      element.setAttribute('aria-invalid', message === '' ? 'false' : 'true');
+    }
+
+    /** 把当前状态同步进地址栏（Copy link 的基础）；无效时清掉参数。 */
+    function syncUrl(state: ChartState | null): void {
+      const url = new URL(window.location.href);
+      url.search = state ? encodeState(state).toString() : '';
+      window.history.replaceState(null, '', url);
+    }
+
+    function renderPending(message: string): void {
+      view.readout?.setAttribute('data-state', 'pending');
+      if (view.canvas) view.canvas.hidden = true;
+      if (view.note) {
+        view.note.hidden = false;
+        view.note.textContent = message;
+      }
+      if (view.copyButton) view.copyButton.disabled = true;
+      if (view.downloadButton) view.downloadButton.disabled = true;
+      if (view.linkNote) view.linkNote.hidden = true;
+    }
+
+    /** 预览与导出走同一个 drawChart；预览按 devicePixelRatio 放大保证清晰。 */
+    function drawPreview(): void {
+      if (!view.canvas || !lastState) return;
+      const cssWidth = view.canvas.clientWidth || 600;
+      const cssHeight = Math.round((cssWidth * 680) / 1080);
+      const dpr = window.devicePixelRatio || 1;
+      view.canvas.width = Math.round(cssWidth * dpr);
+      view.canvas.height = Math.round(cssHeight * dpr);
+      const ctx = view.canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawChart(ctx, lastState, { width: cssWidth, height: cssHeight });
+    }
+
+    /** 重新校验并渲染。输入变化即调用；URL 同步也在这里完成。 */
+    function render(): void {
+      lastState = null;
+
+      const data = parseChartData(view.data?.value ?? '');
+      const title = parseTitle(view.title?.value ?? '');
+      const checked = view.typeRadios.find((radio) => radio.checked);
+      const type: ChartType | undefined = (CHART_TYPES as readonly string[]).includes(
+        checked?.value ?? '',
+      )
+        ? (checked?.value as ChartType)
+        : undefined;
+
+      if (view.data && view.dataError) {
+        setError(view.data, view.dataError, data.ok ? '' : data.message);
+      }
+      if (view.title && view.titleError) {
+        setError(view.title, view.titleError, title.ok ? '' : title.message);
+      }
+      if (view.notice) {
+        view.notice.hidden = !(data.ok && data.value.notice !== '');
+        view.notice.textContent = data.ok ? data.value.notice : '';
+      }
+
+      if (!data.ok || !title.ok) {
+        renderPending('Paste at least two rows of data to see a chart.');
+        syncUrl(null);
+        return;
+      }
+      if (type === undefined) {
+        renderPending('Pick a chart type.');
+        syncUrl(null);
+        return;
+      }
+
+      const check = validateForType(type, data.value.points);
+      if (view.data && view.typeError) {
+        setError(view.data, view.typeError, check.ok ? '' : check.message);
+      }
+      if (!check.ok) {
+        renderPending('Paste at least two rows of data to see a chart.');
+        syncUrl(null);
+        return;
+      }
+
+      lastState = { title: title.value, type, points: data.value.points };
+      syncUrl(lastState);
+
+      const encoded = encodeState(lastState).toString();
+      const linkFits = encoded.length <= MAX_LINK_CHARS;
+      if (view.linkNote) view.linkNote.hidden = linkFits;
+      if (view.copyButton) view.copyButton.disabled = !linkFits;
+      if (view.downloadButton) view.downloadButton.disabled = false;
+
+      const summary = summarize(lastState.points);
+      if (view.note && summary) {
+        view.note.hidden = false;
+        view.note.textContent = `${summary.count} points · highest ${formatChartNumber(summary.max.value)} (${summary.max.label})`;
+      }
+      view.readout?.setAttribute('data-state', 'ok');
+      if (view.canvas) view.canvas.hidden = false;
+      drawPreview();
+    }
+
+    // ── Copy link（AC-009 / AC-034）────────────────────────────────────
+    let copyResetTimer = 0;
+    function resetCopyLabelLater(): void {
+      if (!view.copyButton) return;
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        if (view.copyButton) view.copyButton.textContent = 'Copy link';
+      }, 2000);
+    }
+
+    view.copyButton?.addEventListener('click', () => {
+      if (!lastState || !view.copyButton) return;
+      const url = new URL(window.location.href);
+      url.search = encodeState(lastState).toString();
+
+      const write = navigator.clipboard?.writeText(url.href);
+      if (!write) {
+        view.copyButton.textContent = 'Copying is not available in this browser';
+        resetCopyLabelLater();
+        return;
+      }
+
+      write
+        .then(() => {
+          if (view.copyButton) view.copyButton.textContent = 'Link copied';
+        })
+        .catch(() => {
+          if (view.copyButton) {
+            view.copyButton.textContent = 'Copying was blocked — copy the address bar link instead';
+          }
+        })
+        .finally(resetCopyLabelLater);
+    });
+
+    // ── Download image（AC-008）：1080 宽 PNG，与预览同一个 drawChart ──
+    view.downloadButton?.addEventListener('click', () => {
+      if (!lastState || !view.downloadButton) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 680;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        view.downloadButton.textContent = 'Not available in this browser';
+        return;
+      }
+      drawChart(ctx, lastState, { width: 1080, height: 680 });
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          if (view.downloadButton) view.downloadButton.textContent = 'Export failed — try again';
+          return;
+        }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `chart-${lastState?.type ?? 'bar'}.png`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }, 'image/png');
+    });
+
+    view.data?.addEventListener('input', render);
+    view.title?.addEventListener('input', render);
+    for (const radio of view.typeRadios) radio.addEventListener('change', render);
+
+    // ── 分享链接：合法参数 → 直接还原成编辑态 ──────────────────────────
+    const decoded = decodeState(new URLSearchParams(window.location.search));
+    if (decoded && view.data) {
+      view.data.value = decoded.points.map((point) => `${point.label}\t${point.value}`).join('\n');
+      view.title.value = decoded.title;
+      const radio = view.typeRadios.find((element) => element.value === decoded.type);
+      if (radio) radio.checked = true;
+    }
+
+    render();
+  }
+
+  // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
+  try {
+    init();
+  } catch {
+    // 页面无 JS 时本来就完整可读（渐进增强），这里保持静默
+  }
+</script>
+
+<style>
+  /* 数据粘贴框：等宽字体让「列」看得见，行高与表格软件一致 */
+  .chart-data {
+    display: block;
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    resize: vertical;
+  }
+
+  .chart-data:hover {
+    border-color: var(--line-strong);
+  }
+
+  .chart-data[aria-invalid='true'] {
+    border-color: var(--danger);
+  }
+
+  .chart-data:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* 解析成功的提示（如「只画了前 50 行」）——不是错误，不用红色 */
+  .chart-notice {
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--warn);
+  }
+
+  /* 图表类型：三个横排选项，占满可用宽度 */
+  .chart-type {
+    border: 0;
+    padding: 0;
+  }
+
+  .chart-type__options {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .chart-type__option {
+    flex: 1;
+  }
+
+  .chart-type__option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+
+  .chart-type__option span {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    text-align: center;
+    color: var(--ink-muted);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition:
+      color var(--dur-state) var(--ease-out),
+      border-color var(--dur-state) var(--ease-out),
+      background-color var(--dur-state) var(--ease-out);
+  }
+
+  .chart-type__option input:checked + span {
+    color: var(--on-accent);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .chart-type__option input:focus-visible + span {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* 画布：固定宽高比，防布局抖动（CLS 预算 §13.1） */
+  .chart-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1080 / 680;
+  }
+
+  /* 链接过长的说明：不是字段错误，放在操作区下面 */
+  .chart-link-note {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+  }
+</style>

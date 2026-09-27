@@ -28,6 +28,18 @@
   --danger: #a32d2d; /* 7.1:1 on --bg */
   --danger-wash: #fbebeb;
 
+  /* ── 图表填充色（chart-maker）──────────────────────────────────────────
+     主色 --accent 的 6 档明度，只用于图表填充，禁止用于文字。
+     2026-09-27 用户批准。单色系是 BR-007 的刻意选择；亮端相邻档区分度低，
+     由扇区白色分隔线 + 标签兜底。canvas 侧的 CHART_SHADES 必须与此逐项一致。
+     对比度明细见 specs/features/chart-maker_技术方案.md。 */
+  --chart-1: #0f6e56; /* 6.20:1 on --bg（= --accent） */
+  --chart-2: #1a9375; /* 3.84:1 on --bg */
+  --chart-3: #2bb693; /* 2.56:1 on --bg */
+  --chart-4: #4ac9a9; /* 2.06:1 on --bg */
+  --chart-5: #79cdb8; /* 1.87:1 on --bg */
+  --chart-6: #a4d6c9; /* 1.61:1 on --bg */
+
   --focus: #0f6e56;
 
   /* ── 卡片主题色（countdown-card 分享产物；canvas-card 内核使用同值） ──

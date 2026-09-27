@@ -78,6 +78,12 @@ export const TOOLS: readonly ToolEntry[] = [
     summary: 'Turn a link, Wi-Fi password or contact into a QR code.',
     category: 'Pictures',
   },
+  {
+    slug: 'chart-maker',
+    title: 'Chart maker',
+    summary: 'Turn pasted numbers into a bar, line or pie chart image.',
+    category: 'Pictures',
+  },
 ];
 
 /** 生成工具页的站内路径（目录式，带尾斜杠，已带部署基路径）。 */
