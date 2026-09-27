@@ -463,9 +463,18 @@ code {
   list-style: none;
 }
 
+/* 双列只在 ≥ 640px 生效：内容列宽 680px 减去间距后每列约 330px，
+   再窄就会把 "Date duration calculator" 这类标题挤成三行，比单列更难扫。
+   断点与上面的页面内边距断点同值，不新增断点。见 DESIGN.md §6-bis.10。 */
+@media (min-width: 640px) {
+  .index-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .index-card {
   display: block;
-  padding: var(--space-5);
+  padding: var(--space-4);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);

@@ -9,53 +9,74 @@
  */
 import { href } from './paths';
 
+/**
+ * 首页分类词表。
+ *
+ * 按「使用者在什么场景下需要它」分，不按技术类型分。锁成字面量联合类型是为了让
+ * 「新增第 5 个分类」变成一次需要人工决定的改动（类型检查会拦住），而不是每周加
+ * 工具时顺手编一个、最后长出 8 个分类和一个 Other 抽屉。
+ *
+ * 原分类里的 Utility 已被废除：它从来不是分类，是「不知道放哪」的抽屉。
+ * 见 specs/DESIGN.md §6-bis.10。
+ */
+export const TOOL_CATEGORIES = ['School', 'Dates', 'Pictures', 'Fun'] as const;
+
+export type ToolCategory = (typeof TOOL_CATEGORIES)[number];
+
 export interface ToolEntry {
   /** 与 URL 路径、目录名、specs/features/<slug>.md 文件名必须完全一致 */
   slug: string;
   /** 界面上的英文标题 */
   title: string;
-  /** 一句话英文说明，≤ 90 字符 */
+  /**
+   * 一句话英文说明。硬上限 60 字符（目标 ≤ 45，即首页卡片里只占一行）。
+   * 由 src/lib/shared/tools.test.ts 机械校验。
+   */
   summary: string;
-  /** 分类的英文短标签，用于首页分组 */
-  category: string;
+  /** 分类标签，必须是 TOOL_CATEGORIES 之一 */
+  category: ToolCategory;
 }
 
+/**
+ * 登记顺序 = 首页展示顺序，且**按分类相邻排列**。
+ * 这样工具数达到 12 个、启用分组标题时（DESIGN.md §6-bis.10）不需要重新洗牌。
+ */
 export const TOOLS: readonly ToolEntry[] = [
   {
     slug: 'grade-calculator',
     title: 'Final grade calculator',
-    summary: 'See what score you need on the final to reach your target grade.',
-    category: 'Study',
-  },
-  {
-    slug: 'countdown-card',
-    title: 'Countdown card',
-    summary: 'Turn a date into a shareable countdown or anniversary card.',
-    category: 'Life',
-  },
-  {
-    slug: 'date-duration',
-    title: 'Date duration calculator',
-    summary: 'Count days, weeks and weekdays between two dates, with milestone reminders.',
-    category: 'Life',
+    summary: 'What you need on the final to reach your target grade.',
+    category: 'School',
   },
   {
     slug: 'random-picker',
     title: 'Random group & name picker',
-    summary: 'Split a list into random groups, draw names, or shuffle the order.',
-    category: 'Study',
+    summary: 'Split a list into teams, draw names, shuffle the order.',
+    category: 'School',
+  },
+  {
+    slug: 'countdown-card',
+    title: 'Countdown card maker',
+    summary: 'Turn a date into a countdown or anniversary card.',
+    category: 'Dates',
+  },
+  {
+    slug: 'date-duration',
+    title: 'Date duration calculator',
+    summary: 'Days, weeks and weekdays between two dates.',
+    category: 'Dates',
   },
   {
     slug: 'ascii-art',
     title: 'Image to ASCII art',
-    summary: 'Turn a picture into ASCII character art — copy the text or download a PNG.',
-    category: 'Fun',
+    summary: 'Turn a picture into text art you can copy or download.',
+    category: 'Pictures',
   },
   {
     slug: 'qr-code',
     title: 'QR code generator',
-    summary: 'Turn a link, Wi-Fi password or contact into a QR code you can print or share.',
-    category: 'Utility',
+    summary: 'Turn a link, Wi-Fi password or contact into a QR code.',
+    category: 'Pictures',
   },
 ];
 
