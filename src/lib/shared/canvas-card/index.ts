@@ -334,3 +334,178 @@ export function drawGroupCard(ctx: CanvasRenderingContext2D, content: GroupCardC
 
   ctx.restore();
 }
+
+// ---------------------------------------------------------------------------
+// 团队模式：分队结果卡片（random-picker-team-mode，AC-026 / 027）
+// ---------------------------------------------------------------------------
+
+/** 一支队伍在卡片上的内容；members 已带好队长标记（如 "Alice (C)"）。 */
+export interface TeamCardTeam {
+  label: string;
+  /** 总分文案（如 "23 pts"）；无人打分时为空串，不渲染 */
+  totalLabel: string;
+  members: string[];
+}
+
+/** 团队卡片需要的内容（逻辑层已算好文案）。 */
+export interface TeamCardContent {
+  title: string;
+  modeLabel: string;
+  teams: TeamCardTeam[];
+  dateLabel: string;
+}
+
+/** 排版后的一块：队名 + 总分 + 成员行。 */
+export interface TeamCardBlock {
+  label: string;
+  totalLabel: string;
+  memberLines: string[];
+}
+
+export interface TeamCardLayout {
+  width: number;
+  height: number;
+  contentBottom: number;
+  /** 2 队对战卡：左右两栏 + 中间 VS */
+  vs: boolean;
+  columns: TeamCardBlock[][];
+}
+
+/**
+ * 计算团队卡片的排版：2 队 = 左右两栏对战卡，3 队及以上 = 最多三栏网格。
+ *
+ * 纯函数——度量通过 `measure` 注入（jsdom 无 canvas，测试用假测量器）。
+ */
+export function computeTeamCardLayout(
+  content: TeamCardContent,
+  measure: MeasureTextAt,
+): TeamCardLayout {
+  const vs = content.teams.length === 2;
+  const cols = content.teams.length >= 3 ? 3 : Math.max(content.teams.length, 1);
+  const columnWidth = (CARD_WIDTH - CARD_MARGIN * 2 - COLUMN_GAP * (cols - 1)) / cols;
+  const maxTextWidth = columnWidth - LINE_HEIGHT;
+
+  const fitName = (name: string): string => {
+    if (measure(name, MEMBER_SIZE) <= maxTextWidth) return name;
+    let cut = name.length;
+    while (cut > 1 && measure(`${name.slice(0, cut - 1)}…`, MEMBER_SIZE) > maxTextWidth) {
+      cut -= 1;
+    }
+    return `${name.slice(0, Math.max(cut - 1, 1))}…`;
+  };
+
+  const blocks: TeamCardBlock[] = content.teams.map((team) => ({
+    label: team.label,
+    totalLabel: team.totalLabel,
+    memberLines: team.members.map(fitName),
+  }));
+
+  const blockHeight = (block: TeamCardBlock): number =>
+    (block.memberLines.length + (block.label === '' ? 0 : 1) + (block.totalLabel === '' ? 0 : 1)) *
+    LINE_HEIGHT;
+
+  const columns: TeamCardBlock[][] = Array.from({ length: cols }, () => []);
+  const heights = new Array<number>(cols).fill(0);
+  for (const block of blocks) {
+    let target = 0;
+    for (let i = 1; i < cols; i += 1) {
+      if ((heights[i] ?? 0) < (heights[target] ?? 0)) target = i;
+    }
+    columns[target]!.push(block);
+    heights[target] = (heights[target] ?? 0) + blockHeight(block) + LINE_HEIGHT;
+  }
+
+  const modeBaseline = content.title === '' ? 170 : 234;
+  const dateBaseline = modeBaseline + 62;
+  const contentTop = dateBaseline + 70;
+  const contentBottom = contentTop + Math.max(...heights, LINE_HEIGHT);
+  const height = contentBottom + 110; // 底部页脚（站点标识）
+
+  return { width: CARD_WIDTH, height, contentBottom, vs, columns };
+}
+
+/**
+ * 绘制分队结果卡片：2 队为左右对战卡（中间 VS），3 队及以上为网格卡。
+ *
+ * 调用方负责创建画布（含 2 倍分辨率处理）与下载/展示。
+ */
+export function drawTeamCard(ctx: CanvasRenderingContext2D, content: TeamCardContent): void {
+  const measure: MeasureTextAt = (text, px) => {
+    ctx.font = `400 ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    return ctx.measureText(text).width;
+  };
+  const layout = computeTeamCardLayout(content, measure);
+  const colors = CARD_THEMES.light;
+  const FONT = (px: number, weight = 400) =>
+    `${weight} ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+
+  ctx.save();
+  ctx.fillStyle = colors.background;
+  ctx.fillRect(0, 0, layout.width, layout.height);
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+
+  const modeBaseline = content.title === '' ? 170 : 234;
+  const dateBaseline = modeBaseline + 62;
+
+  if (content.title !== '') {
+    ctx.font = FONT(64, 500);
+    ctx.fillStyle = colors.ink;
+    ctx.fillText(content.title, CARD_MARGIN, modeBaseline - 84);
+  }
+
+  ctx.font = FONT(44, 600);
+  ctx.fillStyle = colors.accent;
+  ctx.fillText(content.modeLabel, CARD_MARGIN, modeBaseline);
+
+  ctx.font = FONT(36);
+  ctx.fillStyle = colors.muted;
+  ctx.fillText(content.dateLabel, CARD_MARGIN, dateBaseline);
+
+  const contentTop = dateBaseline + 70;
+  const columnWidth =
+    (layout.width - CARD_MARGIN * 2 - COLUMN_GAP * (layout.columns.length - 1)) /
+    layout.columns.length;
+
+  layout.columns.forEach((column, colIndex) => {
+    const x = CARD_MARGIN + colIndex * (columnWidth + COLUMN_GAP) + LINE_HEIGHT / 2;
+    let cursor = contentTop;
+    for (const block of column) {
+      if (block.label !== '') {
+        ctx.font = FONT(LABEL_SIZE, 600);
+        ctx.fillStyle = colors.accent;
+        cursor += LABEL_SIZE;
+        ctx.fillText(block.label, x, cursor);
+        cursor += LINE_HEIGHT - LABEL_SIZE;
+      }
+      if (block.totalLabel !== '') {
+        ctx.font = FONT(30, 500);
+        ctx.fillStyle = colors.muted;
+        cursor += LINE_HEIGHT;
+        ctx.fillText(block.totalLabel, x, cursor);
+      }
+      ctx.font = FONT(MEMBER_SIZE);
+      ctx.fillStyle = colors.ink;
+      for (const line of block.memberLines) {
+        cursor += LINE_HEIGHT;
+        ctx.fillText(line, x, cursor);
+      }
+      cursor += LINE_HEIGHT;
+    }
+  });
+
+  // 对战卡：两栏中间一个 VS，垂直居中于内容区。
+  if (layout.vs) {
+    ctx.font = FONT(56, 600);
+    ctx.fillStyle = colors.muted;
+    ctx.textAlign = 'center';
+    ctx.fillText('VS', layout.width / 2, (contentTop + layout.contentBottom) / 2 + 20);
+  }
+
+  ctx.font = FONT(30, 500);
+  ctx.fillStyle = colors.muted;
+  ctx.textAlign = 'right';
+  ctx.fillText('PlainKit', layout.width - CARD_MARGIN, layout.height - 70);
+
+  ctx.restore();
+}

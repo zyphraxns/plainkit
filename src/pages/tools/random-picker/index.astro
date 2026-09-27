@@ -34,7 +34,7 @@ const summary =
             rows="8"
             autocomplete="off"
             spellcheck="false"
-            placeholder="One name per line (commas work too)"
+            placeholder="One name per line — Alice:8 for a rating"
             aria-describedby="names-hint dup-warning"
           ></textarea>
           <p class="bench__error" id="names-hint" role="status"></p>
@@ -44,6 +44,7 @@ const summary =
               Remove duplicates
             </button>
           </p>
+          <p class="bench__note" id="team-notes" role="status"></p>
           <button type="button" class="link-btn bench__clear" id="clear">
             Clear list
           </button>
@@ -65,6 +66,10 @@ const summary =
             <label class="mode-switch__option">
               <input type="radio" name="mode" id="mode-order" value="order" />
               <span>Random order</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="mode" id="mode-teams" value="teams" />
+              <span>Teams</span>
             </label>
           </div>
         </div>
@@ -106,6 +111,7 @@ const summary =
 
       <output class="readout" id="readout" data-state="pending" aria-live="polite">
         <p class="readout__label">Result</p>
+        <p class="readout__value" id="readout-value" hidden></p>
         <div class="result" id="result" hidden></div>
         <p class="readout__note" id="readout-note">
           Enter at least 2 names, then press Generate.
@@ -133,6 +139,15 @@ const summary =
         groups you get groups of 6, 6, 6 and 5.
       </p>
 
+      <h2 class="tool__notes-title">Balanced teams</h2>
+      <p class="tool__notes-body">
+        In Teams mode you can add a rating after any name — <code>Alice:8</code> — and the teams
+        come out with near-equal total ratings. Anyone without a rating is counted at the average of
+        the people who have one. Team size stays even first: with 23 people in 4 teams you get 6, 6,
+        6 and 5, and only then are the ratings balanced. The highest-rated person in each team is
+        marked (C) as captain.
+      </p>
+
       <h2 class="tool__notes-title">Sharing</h2>
       <p class="tool__notes-body">
         Copy text gives you a plain list ready to paste into any chat. Download image saves a PNG
@@ -150,24 +165,35 @@ const summary =
 </BaseLayout>
 
 <script>
-  import { drawGroupCard, computeGroupCardLayout } from '@/lib/shared/canvas-card';
-  import type { GroupCardContent } from '@/lib/shared/canvas-card';
+  import {
+    computeGroupCardLayout,
+    computeTeamCardLayout,
+    drawGroupCard,
+    drawTeamCard,
+  } from '@/lib/shared/canvas-card';
+  import type { GroupCardContent, TeamCardContent } from '@/lib/shared/canvas-card';
   import {
     assignGroups,
+    balanceTeams,
+    clampTeamCount,
+    fillMissingRatings,
     formatGroupsText,
     formatListText,
+    formatTeamsSummary,
+    formatTeamsText,
     parseCount,
+    parseRoster,
     pickNames,
     shuffle,
     splitNames,
     dedupeNames,
   } from '@/lib/tools/random-picker';
-  import type { RandomSource } from '@/lib/tools/random-picker';
+  import type { RandomSource, RosterEntry, Team } from '@/lib/tools/random-picker';
 
   const MAX_NAMES = 300;
   const STORAGE_KEY = 'plainkit.random-picker.names';
 
-  type Mode = 'groups' | 'pick' | 'order';
+  type Mode = 'groups' | 'pick' | 'order' | 'teams';
   type GroupBy = 'count' | 'size';
 
   /** 最近一次成功生成的结果，供 Regenerate / Copy / Download 使用。 */
@@ -175,8 +201,15 @@ const summary =
     mode: Mode;
     groupBy: GroupBy;
     param: number;
+    /** 通用渲染用的分块（分组 / 抽人 / 排序 / 分队） */
     groups: { label: string; members: string[] }[];
     members: string[];
+    /** 分队模式的结构化结果（复制文本与卡片用） */
+    teams: Team[] | null;
+    /** 本次是否用到了评分 */
+    rated: boolean;
+    /** 结果读数文案，如 "23 vs 22" */
+    summary: string;
     modeLabel: string;
   }
 
@@ -198,6 +231,9 @@ const summary =
     const modeGroups = document.querySelector('#mode-groups');
     const modePick = document.querySelector('#mode-pick');
     const modeOrder = document.querySelector('#mode-order');
+    const modeTeams = document.querySelector('#mode-teams');
+    const teamNotes = document.querySelector('#team-notes');
+    const readoutValue = document.querySelector('#readout-value');
     const groupByField = document.querySelector('#group-by-field');
     const groupBySelect = document.querySelector('#group-by');
     const paramField = document.querySelector('#param-field');
@@ -222,6 +258,9 @@ const summary =
       !(modeGroups instanceof HTMLInputElement) ||
       !(modePick instanceof HTMLInputElement) ||
       !(modeOrder instanceof HTMLInputElement) ||
+      !(modeTeams instanceof HTMLInputElement) ||
+      !(teamNotes instanceof HTMLElement) ||
+      !(readoutValue instanceof HTMLElement) ||
       !(groupByField instanceof HTMLElement) ||
       !(groupBySelect instanceof HTMLSelectElement) ||
       !(paramField instanceof HTMLElement) ||
@@ -240,7 +279,7 @@ const summary =
     }
 
     const clearButton2 = clearButton instanceof HTMLButtonElement ? clearButton : null;
-    const modeRadios = [modeGroups, modePick, modeOrder];
+    const modeRadios = [modeGroups, modePick, modeOrder, modeTeams];
     let lastResult: PickerResult | null = null;
     let copyResetTimer = 0;
     /** 用户是否动过名单框——初始空状态不显示红色引导（与 grade-calculator 同约定）。 */
@@ -253,6 +292,8 @@ const summary =
       dupWarning,
       dupNames,
       dedupeButton,
+      teamNotes,
+      readoutValue,
       groupByField,
       groupBySelect,
       paramField,
@@ -292,7 +333,105 @@ const summary =
         view.paramLabel.textContent = groupBy === 'count' ? 'Number of groups' : 'People per group';
       } else if (mode === 'pick') {
         view.paramLabel.textContent = 'People to pick';
+      } else if (mode === 'teams') {
+        view.paramLabel.textContent = 'Number of teams';
+        view.paramInput.value = '2';
+        view.paramError.textContent = '';
       }
+      if (mode !== 'teams') view.teamNotes.textContent = '';
+    }
+
+    /** 团队模式的名单解析：评分、重复、容量上限（AC-030 / 034 / 035 / 036）。 */
+    function readTeams(): {
+      entries: RosterEntry[];
+      duplicates: string[];
+      badRatingLines: number;
+    } {
+      const roster = parseRoster(view.namesInput.value);
+      const entries = roster.entries.slice(0, MAX_NAMES);
+      const count = entries.length;
+      view.namesCount.textContent = `${count} ${count === 1 ? 'name' : 'names'}`;
+
+      const seen = new Set<string>();
+      const duplicates = new Set<string>();
+      for (const entry of entries) {
+        if (seen.has(entry.name)) {
+          duplicates.add(entry.name);
+        } else {
+          seen.add(entry.name);
+        }
+      }
+      if (duplicates.size > 0) {
+        view.dupWarning.hidden = false;
+        view.dupNames.textContent = `Duplicate names: ${[...duplicates].join(', ')}.`;
+      } else {
+        view.dupWarning.hidden = true;
+      }
+
+      view.namesHint.textContent =
+        roster.entries.length > MAX_NAMES ? `Only the first ${MAX_NAMES} names are used.` : '';
+      return { entries, duplicates: [...duplicates], badRatingLines: roster.badRatingLines };
+    }
+
+    /** 团队模式的生成：评分分队 + 队长（AC-019 – 031）。 */
+    function generateTeams(): void {
+      const { entries, badRatingLines } = readTeams();
+      if (entries.length < 2) {
+        renderPending('Enter at least 2 names, then press Generate.');
+        return;
+      }
+
+      const filled = fillMissingRatings(entries);
+      const max = filled.entries.length;
+      view.paramInput.max = String(max);
+
+      const raw = Number(view.paramInput.value.trim());
+      if (!Number.isInteger(raw)) {
+        view.paramError.textContent = 'Number of teams must be a whole number between 2 and 10.';
+        view.paramInput.setAttribute('aria-invalid', 'true');
+        renderPending('Fix the highlighted field and try again.');
+        return;
+      }
+      const clamped = clampTeamCount(raw, max);
+      if (clamped.note !== null) {
+        view.paramInput.value = String(clamped.value);
+        view.paramError.textContent = clamped.note;
+      } else {
+        view.paramError.textContent = '';
+      }
+      view.paramInput.removeAttribute('aria-invalid');
+
+      const teams = balanceTeams(filled.entries, clamped.value, cryptoRandom);
+
+      const notes: string[] = [];
+      if (filled.rated && filled.unratedCount > 0) {
+        notes.push(
+          `${filled.unratedCount} ${filled.unratedCount === 1 ? 'person has' : 'people have'} no rating — counted as ${filled.average}.`,
+        );
+      }
+      if (badRatingLines > 0) {
+        notes.push(
+          `${badRatingLines} ${badRatingLines === 1 ? 'line has' : 'lines have'} a rating we could not read — treated as a name.`,
+        );
+      }
+      view.teamNotes.textContent = notes.join(' ');
+
+      renderResult({
+        mode: 'teams',
+        groupBy: 'count',
+        param: clamped.value,
+        groups: teams.map((team, index) => ({
+          label: filled.rated ? `Team ${index + 1} — ${team.total} pts` : `Team ${index + 1}`,
+          members: team.members.map((member, i) =>
+            i === team.captain ? `${member.name} (C)` : member.name,
+          ),
+        })),
+        members: teams.flatMap((team) => team.members.map((member) => member.name)),
+        teams,
+        rated: filled.rated,
+        summary: formatTeamsSummary(teams, filled.rated),
+        modeLabel: `${filled.entries.length} names in ${clamped.value} balanced teams`,
+      });
     }
 
     /** 名单解析 + 容量上限（AC-008 / 009 / 014）。 */
@@ -322,6 +461,8 @@ const summary =
       view.resultBox.textContent = '';
       view.readoutNote.hidden = false;
       view.readoutNote.textContent = note;
+      view.readoutValue.hidden = true;
+      view.readoutValue.textContent = '';
       view.regenerateButton.disabled = true;
       view.copyButton.disabled = true;
       view.downloadButton.disabled = true;
@@ -346,6 +487,8 @@ const summary =
       view.resultBox.textContent = '';
       view.readoutNote.hidden = true;
       view.readout.dataset.state = 'ok';
+      view.readoutValue.hidden = result.summary === '';
+      view.readoutValue.textContent = result.summary;
 
       for (const group of result.groups) {
         const block = document.createElement('div');
@@ -374,13 +517,19 @@ const summary =
 
     /** 用当前输入计算一次随机结果（Generate 与 Regenerate 共用，AC-007）。 */
     function generate(): void {
+      const mode = currentMode();
+      if (mode === 'teams') {
+        generateTeams();
+        return;
+      }
+
+      view.teamNotes.textContent = '';
       const names = readNames();
       if (names.length < 2) {
         renderPending('Enter at least 2 names, then press Generate.');
         return;
       }
 
-      const mode = currentMode();
       const groupBy = view.groupBySelect.value as GroupBy;
       const paramLabel =
         mode === 'groups'
@@ -425,7 +574,17 @@ const summary =
         modeLabel = `${names.length} names in random order`;
       }
 
-      renderResult({ mode, groupBy, param, groups, members, modeLabel });
+      renderResult({
+        mode,
+        groupBy,
+        param,
+        groups,
+        members,
+        teams: null,
+        rated: false,
+        summary: '',
+        modeLabel,
+      });
     }
 
     // ── 输入与名单持久化（AC-008 / 016）─────────────────────────────────
@@ -490,6 +649,9 @@ const summary =
     // ── 复制文本（AC-006）───────────────────────────────────────────────
     function resultText(result: PickerResult): string {
       const header = `${result.modeLabel} · ${todayLabel()} · PlainKit`;
+      if (result.teams) {
+        return formatTeamsText(result.teams, header, result.rated);
+      }
       if (result.groups.length === 1 && result.groups[0]!.label === '') {
         return formatListText(result.members, header);
       }
@@ -528,12 +690,6 @@ const summary =
     view.downloadButton.addEventListener('click', () => {
       if (!lastResult) return;
       const result = lastResult;
-      const content: GroupCardContent = {
-        title: '',
-        modeLabel: result.modeLabel,
-        groups: result.groups,
-        dateLabel: todayLabel(),
-      };
 
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
@@ -546,9 +702,35 @@ const summary =
         ctx.font = `400 ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
         return ctx.measureText(text).width;
       };
-      canvas.height = computeGroupCardLayout(content, measure).height;
 
-      drawGroupCard(ctx, content);
+      let filename = 'random-groups.png';
+      if (result.teams) {
+        const teamContent: TeamCardContent = {
+          title: '',
+          modeLabel: result.modeLabel,
+          teams: result.teams.map((team, index) => ({
+            label: `Team ${index + 1}`,
+            totalLabel: result.rated ? `${team.total} pts` : '',
+            members: team.members.map((member, i) =>
+              i === team.captain ? `${member.name} (C)` : member.name,
+            ),
+          })),
+          dateLabel: todayLabel(),
+        };
+        canvas.height = computeTeamCardLayout(teamContent, measure).height;
+        drawTeamCard(ctx, teamContent);
+        filename = 'random-teams.png';
+      } else {
+        const content: GroupCardContent = {
+          title: '',
+          modeLabel: result.modeLabel,
+          groups: result.groups,
+          dateLabel: todayLabel(),
+        };
+        canvas.height = computeGroupCardLayout(content, measure).height;
+        drawGroupCard(ctx, content);
+      }
+
       canvas.toBlob((blob) => {
         if (!blob) {
           view.downloadButton.textContent = 'Export failed — try again';
@@ -556,7 +738,7 @@ const summary =
         }
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = 'random-groups.png';
+        link.download = filename;
         link.click();
         URL.revokeObjectURL(link.href);
       }, 'image/png');
@@ -607,6 +789,13 @@ const summary =
     display: flex;
     gap: var(--space-2);
     flex-wrap: wrap;
+  }
+
+  /* 团队模式的说明行：是提示不是报错，所以用弱化色而不是错误色 */
+  .bench__note {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
   }
 
   /* display:flex 会覆盖 hidden 属性的默认样式，必须显式压回 */

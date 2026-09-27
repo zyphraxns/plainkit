@@ -142,3 +142,101 @@ describe('computeGroupCardLayout', () => {
     expect(layout.height).toBeGreaterThan(layout.contentBottom);
   });
 });
+
+// ---------------------------------------------------------------------------
+// computeTeamCardLayout（团队模式：对战卡 / 网格卡）
+// ---------------------------------------------------------------------------
+
+import { computeTeamCardLayout } from './index';
+
+/** 一支队伍的卡片内容。 */
+function teamCard(teams: Array<{ label: string; totalLabel: string; members: string[] }>) {
+  return {
+    title: '',
+    modeLabel: '12 names in 2 balanced teams',
+    teams,
+    dateLabel: 'September 27, 2026',
+  };
+}
+
+describe('computeTeamCardLayout', () => {
+  it('AC-026: two teams become a versus card with two columns', () => {
+    const layout = computeTeamCardLayout(
+      teamCard([
+        { label: 'Team 1', totalLabel: '23 pts', members: ['a', 'b'] },
+        { label: 'Team 2', totalLabel: '22 pts', members: ['c', 'd'] },
+      ]),
+      fakeMeasureText,
+    );
+    expect(layout.vs).toBe(true);
+    expect(layout.columns).toHaveLength(2);
+    expect(layout.width).toBe(1080);
+  });
+
+  it('AC-027: four teams fall back to a three-column grid', () => {
+    const layout = computeTeamCardLayout(
+      teamCard([
+        { label: 'Team 1', totalLabel: '10 pts', members: ['a'] },
+        { label: 'Team 2', totalLabel: '10 pts', members: ['b'] },
+        { label: 'Team 3', totalLabel: '10 pts', members: ['c'] },
+        { label: 'Team 4', totalLabel: '9 pts', members: ['d'] },
+      ]),
+      fakeMeasureText,
+    );
+    expect(layout.vs).toBe(false);
+    expect(layout.columns).toHaveLength(3);
+  });
+
+  it('AC-013: keeps every member — 300 people across 2 teams are all laid out', () => {
+    const members = Array.from({ length: 150 }, (_, i) => `player-${i + 1}`);
+    const layout = computeTeamCardLayout(
+      teamCard([
+        { label: 'Team 1', totalLabel: '750 pts', members },
+        { label: 'Team 2', totalLabel: '749 pts', members },
+      ]),
+      fakeMeasureText,
+    );
+    const laidOut = layout.columns.flat().flatMap((block) => block.memberLines);
+    expect(laidOut).toHaveLength(300);
+  });
+
+  it('grows the canvas with the number of people', () => {
+    const small = computeTeamCardLayout(
+      teamCard([
+        { label: 'Team 1', totalLabel: '23 pts', members: ['a', 'b', 'c'] },
+        { label: 'Team 2', totalLabel: '22 pts', members: ['d', 'e', 'f'] },
+      ]),
+      fakeMeasureText,
+    );
+    const big = computeTeamCardLayout(
+      teamCard([
+        {
+          label: 'Team 1',
+          totalLabel: '23 pts',
+          members: Array.from({ length: 30 }, (_, i) => `p${i}`),
+        },
+        {
+          label: 'Team 2',
+          totalLabel: '22 pts',
+          members: Array.from({ length: 30 }, (_, i) => `q${i}`),
+        },
+      ]),
+      fakeMeasureText,
+    );
+    expect(big.height).toBeGreaterThan(small.height);
+    expect(big.height).toBeGreaterThan(big.contentBottom);
+  });
+
+  it('truncates names that cannot fit in a column', () => {
+    const layout = computeTeamCardLayout(
+      teamCard([
+        { label: 'Team 1', totalLabel: '23 pts', members: ['x'.repeat(200)] },
+        { label: 'Team 2', totalLabel: '22 pts', members: ['y'] },
+      ]),
+      fakeMeasureText,
+    );
+    const laidOut = layout.columns.flat().flatMap((block) => block.memberLines);
+    expect(laidOut[0]!.endsWith('…')).toBe(true);
+    expect(laidOut[0]!.length).toBeLessThan(200);
+  });
+});
