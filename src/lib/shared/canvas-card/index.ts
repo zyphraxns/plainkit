@@ -509,3 +509,94 @@ export function drawTeamCard(ctx: CanvasRenderingContext2D, content: TeamCardCon
 
   ctx.restore();
 }
+
+// ---------------------------------------------------------------------------
+// 队列 #3：打字测试成就卡（specs/features/typing-test.md BR-009）
+// ---------------------------------------------------------------------------
+
+/** 成就卡需要的内容；文案由逻辑层算好（formatResultLabels），绘制层不拼字符串。 */
+export interface ResultCardContent {
+  /** 大数字（如 "62"） */
+  wpm: string;
+  /** 大数字下的单位（"words per minute"） */
+  unitLabel: string;
+  /** 一行详情（"97% accuracy · in 60 seconds"） */
+  detailLabel: string;
+  /** 评级（"Fast"），顶部小字 */
+  rating: string;
+}
+
+export interface ResultCardLayout {
+  width: number;
+  height: number;
+  /** 自适应后的大数字字号 */
+  wpmPx: number;
+  /** 自适应后的详情行字号 */
+  detailPx: number;
+}
+
+/**
+ * 计算成就卡排版：1080×1080 方卡，唯一动态量是大数字与详情行的字号
+ * （2–3 位 WPM、不定长的 detail 都必须收进 920px 内容宽度）。
+ *
+ * 纯函数——度量通过 `measure` 注入（与 computeTeamCardLayout 同一套路）。
+ */
+export function computeResultCardLayout(
+  content: ResultCardContent,
+  measure: MeasureTextAt,
+): ResultCardLayout {
+  const width = 1080;
+  const height = 1080;
+  const maxTextWidth = width - 160;
+  const wpmPx = fitTextSize(maxTextWidth, 320, 140, (px) => measure(content.wpm, px));
+  const detailPx = fitTextSize(maxTextWidth, 40, 28, (px) => measure(content.detailLabel, px));
+  return { width, height, wpmPx, detailPx };
+}
+
+/**
+ * 绘制打字成绩卡：评级（顶部，强调色）→ WPM 大数字 → 单位 → 详情行 → PlainKit。
+ *
+ * 调用方负责创建画布（含 2 倍分辨率处理）与下载/展示。
+ */
+export function drawResultCard(ctx: CanvasRenderingContext2D, content: ResultCardContent): void {
+  const measure: MeasureTextAt = (text, px) => {
+    ctx.font = `400 ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    return ctx.measureText(text).width;
+  };
+  const layout = computeResultCardLayout(content, measure);
+  const colors = CARD_THEMES.light;
+  const FONT = (px: number, weight = 400) =>
+    `${weight} ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+
+  ctx.save();
+  ctx.fillStyle = colors.background;
+  ctx.fillRect(0, 0, layout.width, layout.height);
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center';
+
+  // 评级：顶部小字，强调色。
+  ctx.font = FONT(56, 600);
+  ctx.fillStyle = colors.accent;
+  ctx.fillText(content.rating, layout.width / 2, 320);
+
+  // WPM 大数字。
+  ctx.font = FONT(layout.wpmPx, 600);
+  ctx.fillStyle = colors.ink;
+  ctx.fillText(content.wpm, layout.width / 2, 600);
+
+  // 单位与详情行。
+  ctx.font = FONT(44);
+  ctx.fillStyle = colors.muted;
+  ctx.fillText(content.unitLabel, layout.width / 2, 690);
+
+  ctx.font = FONT(layout.detailPx);
+  ctx.fillStyle = colors.muted;
+  ctx.fillText(content.detailLabel, layout.width / 2, 780);
+
+  // 站点标识：右下角，不带域名（2026-09-25 裁定）。
+  ctx.font = FONT(30, 500);
+  ctx.textAlign = 'right';
+  ctx.fillText('PlainKit', layout.width - 80, layout.height - 70);
+
+  ctx.restore();
+}

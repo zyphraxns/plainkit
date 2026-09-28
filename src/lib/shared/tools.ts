@@ -84,6 +84,12 @@ export const TOOLS: readonly ToolEntry[] = [
     summary: 'Turn pasted numbers into a bar, line or pie chart image.',
     category: 'Pictures',
   },
+  {
+    slug: 'typing-test',
+    title: 'Typing speed test',
+    summary: 'Measure your typing speed and get a result card.',
+    category: 'Fun',
+  },
 ];
 
 /** 生成工具页的站内路径（目录式，带尾斜杠，已带部署基路径）。 */

@@ -19,6 +19,7 @@ work something out.
 | [Image to ASCII art](https://zyphraxns.github.io/plainkit/tools/ascii-art/)             | Turn a picture into ASCII art — copy the text or download a PNG                 |
 | [QR code generator](https://zyphraxns.github.io/plainkit/tools/qr-code/)                | Turn a link, Wi-Fi password or contact into a QR code you can print             |
 | [Chart maker](https://zyphraxns.github.io/plainkit/tools/chart-maker/)                  | Paste numbers, get a bar, line or pie chart you can download                    |
+| [Typing speed test](https://zyphraxns.github.io/plainkit/tools/typing-test/)            | Type for 60 seconds, get your speed and a result card you can share             |
 
 Every tool produces something worth sharing — a card, an image, or a line of text you can send to
 someone. That is the design rule for the whole collection: if nobody would ever share the result, the

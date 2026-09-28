@@ -1,0 +1,624 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const pageTitle = 'Typing speed test';
+const description =
+  'Type for 60 seconds and get your words per minute, accuracy and a result card you can download or share. Free, no ads, nothing leaves your device.';
+const summary = 'Type for 60 seconds, get your speed and a shareable result card.';
+---
+
+<BaseLayout title={pageTitle} description={description} tool="typing-test">
+  <article class="tool" id="tool">
+    <header class="tool__head">
+      <p class="eyebrow">Typing</p>
+      <h1 class="tool__title">{pageTitle}</h1>
+      <p class="tool__lead">{summary}</p>
+    </header>
+
+    <section class="bench">
+      <div class="bench__rule" aria-hidden="true"></div>
+
+      <div class="typing-stage">
+        <!--
+          五段内置短文（BR-005）：写在 HTML 里而不是 JS 里——词表零 JS 体积，
+          且禁用 JS 时第一段仍然可见（AC-022）。JS 启动后整组隐藏，文本渲染进
+          上面的打字区。
+        -->
+        <div class="typing-passages" id="typing-passages">
+          <p class="typing-passage">
+            The quickest way to get better at something is to pay attention while you do it. Every
+            sentence you type is a small exercise in rhythm and control. Try to keep your eyes on
+            the screen instead of the keyboard, and let your fingers find the letters on their own.
+            Speed comes later; steady accuracy is what carries you through.
+          </p>
+          <p class="typing-passage">
+            A good morning routine does not have to be long. Ten quiet minutes with a cup of coffee
+            and a short list of plans can set the tone for the whole day. The goal is not to fill
+            every hour with work. It is to begin with a clear head, one small step at a time, and
+            let the rest follow.
+          </p>
+          <p class="typing-passage">
+            Cities change slowly, then all at once. A shop closes, a park opens, a new line appears
+            on the map, and one day you notice the street looks nothing like the one you remember.
+            Most people miss the middle part of the story. They only see the beginning and the end,
+            and they wonder where the years went. It pays to look around.
+          </p>
+          <p class="typing-passage">
+            Learning to cook is mostly learning to read a recipe twice before you start. Get the pan
+            warm, chop everything first, and keep the salt within reach. Small habits like these
+            turn a stressful evening into a calm one. Nobody cooks well in a rush, and the food
+            always knows when you hurried. A calm kitchen is a happy kitchen.
+          </p>
+          <p class="typing-passage">
+            The library was quiet in the way that only rainy afternoons can be. Someone turned a
+            page two tables away, the heating hummed against the window, and the light outside
+            turned soft and grey. She wrote one sentence, crossed it out, then wrote it again,
+            slightly better, and decided that this was enough progress for one day. Rain has that
+            effect on people.
+          </p>
+        </div>
+
+        <div class="typing-meta">
+          <p class="typing-clock" id="typing-clock" role="timer">
+            60
+          </p>
+          <p class="typing-hint">Seconds left</p>
+          <!--
+            测试控制按钮贴着打字区（CR-001 / AC-037）：Start / End early / Try again
+            三态切换。不与产物按钮放一起——打字是最高频动作，控制它的按钮必须
+            就在眼前，点完不用再找输入位置。
+          -->
+          <button type="button" class="btn" data-variant="primary" id="test-control">
+            Start
+          </button>
+        </div>
+
+        <div class="typing-track-wrap">
+          <label class="sr-only" for="typing-input">
+            Type the text shown below
+          </label>
+          <div class="typing-track" id="typing-track" aria-hidden="true"></div>
+          <!--
+            原位隐藏输入（2026-09-28 用户裁定，AC-020）：opacity 0 但保留尺寸与
+            可聚焦性（不用 display:none，iOS 拒绝对其聚焦），字号 16px 防 iOS
+            聚焦放大。点击文本区即点中它。
+          -->
+          <input
+            class="typing-input"
+            id="typing-input"
+            type="text"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            maxlength="400"
+            disabled
+          />
+        </div>
+      </div>
+
+      <output class="readout" id="readout" data-state="pending" aria-live="polite">
+        <p class="readout__label">Your result</p>
+        <p class="readout__value" id="readout-value" hidden></p>
+        <p class="readout__note" id="readout-note">
+          Press Start, then type the text above as carefully as you can.
+        </p>
+        <canvas class="typing-canvas" id="typing-canvas" hidden></canvas>
+      </output>
+
+      <div class="tool__actions">
+        <button type="button" class="btn" data-variant="primary" id="copy-link" disabled>
+          Copy link
+        </button>
+        <button type="button" class="btn" id="download-image" disabled>
+          Download image
+        </button>
+      </div>
+    </section>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">How this works</h2>
+      <p class="tool__notes-body">
+        Press Start and the 60-second timer begins right away. Type the text you see; wrong
+        characters turn red and underlined but never stop you, and backspace works as usual. You can
+        press End early once at least 15 seconds have passed — shorter runs are too small a sample
+        to be worth a number.
+      </p>
+      <p class="tool__notes-body">
+        Your speed is counted the standard way: five characters make one word, backspaced characters
+        do not count, and accuracy is the share of characters you got right. Nothing is saved
+        anywhere — close the tab and the result is gone.
+      </p>
+
+      <h2 class="tool__notes-title">Sharing</h2>
+      <p class="tool__notes-body">
+        Download image saves a result card with a small PlainKit mark in the corner. Copy link puts
+        your result into the link itself — anyone who opens it sees the same card, and nothing ever
+        touches a server.
+      </p>
+    </section>
+  </article>
+</BaseLayout>
+
+<script>
+  import {
+    buildTargetBuffer,
+    computeStats,
+    decodeResult,
+    diffTyping,
+    encodeResult,
+    formatResultLabels,
+    needsMoreTarget,
+    ratingFor,
+    type TargetBuffer,
+    type TypingStats,
+  } from '@/lib/tools/typing-test';
+  import { drawResultCard } from '@/lib/shared/canvas-card';
+
+  /** 测试时长（BR-001）。 */
+  const DURATION_MS = 60000;
+
+  function init(): void {
+    const view = {
+      passages: Array.from(document.querySelectorAll<HTMLParagraphElement>('.typing-passage')),
+      passageGroup: document.querySelector('#typing-passages') as HTMLDivElement | null,
+      track: document.querySelector('#typing-track') as HTMLDivElement | null,
+      input: document.querySelector('#typing-input') as HTMLInputElement | null,
+      clock: document.querySelector('#typing-clock') as HTMLParagraphElement | null,
+      readout: document.querySelector('#readout') as HTMLOutputElement | null,
+      readoutValue: document.querySelector('#readout-value') as HTMLParagraphElement | null,
+      note: document.querySelector('#readout-note') as HTMLParagraphElement | null,
+      canvas: document.querySelector('#typing-canvas') as HTMLCanvasElement | null,
+      control: document.querySelector('#test-control') as HTMLButtonElement | null,
+      copyButton: document.querySelector('#copy-link') as HTMLButtonElement | null,
+      downloadButton: document.querySelector('#download-image') as HTMLButtonElement | null,
+    };
+    if (
+      !view.passageGroup ||
+      !view.track ||
+      !view.input ||
+      !view.clock ||
+      !view.readout ||
+      !view.readoutValue ||
+      !view.note ||
+      !view.canvas ||
+      !view.control ||
+      !view.copyButton ||
+      !view.downloadButton ||
+      view.passages.length === 0
+    ) {
+      return;
+    }
+
+    // 段落来自本页 HTML；规范化空白，杜绝源码缩进混进文本（BR-005）。
+    const passages = view.passages.map((element) =>
+      (element.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+
+    type Phase = 'idle' | 'running' | 'done' | 'shared';
+    let phase: Phase = 'idle';
+    let currentIndex = 0;
+    let buffer: TargetBuffer | null = null;
+    let spans: HTMLSpanElement[] = [];
+    let startedAt = 0;
+    let timerId = 0;
+    let lastStats: TypingStats | null = null;
+
+    function setClock(seconds: number): void {
+      view.clock!.textContent = String(seconds);
+    }
+
+    /** 把 buffer 渲染成字符 span（无 JS 时该区为空，段落原样可见，AC-022）。 */
+    function renderTrack(): void {
+      if (!view.track || !buffer) return;
+      const fragment = document.createDocumentFragment();
+      spans = [];
+      for (const character of buffer.text) {
+        const span = document.createElement('span');
+        span.textContent = character;
+        fragment.appendChild(span);
+        spans.push(span);
+      }
+      view.track.replaceChildren(fragment);
+      view.input!.maxLength = buffer.text.length;
+    }
+
+    /** 按 diff 刷新着色；光标 = 下一个待打位置。 */
+    function paint(diff: { states: string[] }, typedLength: number): void {
+      for (let i = 0; i < spans.length; i += 1) {
+        const span = spans[i]!;
+        const state = diff.states[i] ?? 'pending';
+        span.classList.toggle('is-correct', state === 'correct');
+        span.classList.toggle('is-wrong', state === 'wrong');
+        span.classList.toggle('is-cursor', i === typedLength);
+      }
+    }
+
+    function renderPending(message: string): void {
+      view.readout!.setAttribute('data-state', 'pending');
+      view.readoutValue!.hidden = true;
+      view.canvas!.hidden = true;
+      view.note!.hidden = false;
+      view.note!.textContent = message;
+      view.copyButton!.disabled = true;
+      view.downloadButton!.disabled = true;
+    }
+
+    /** 预览与导出走同一个 drawResultCard（AC-011 / AC-012 / AC-029）。
+     *  画布内部固定 1080×1080（卡片的设计坐标），CSS 负责缩放显示——
+     *  drawResultCard 按 1080 布局，内部尺寸若跟随 CSS 宽度会把内容画到画布外
+     *  （2026-09-28 浏览器验收实测踩坑）。 */
+    function drawCardPreview(): void {
+      if (!view.canvas || !lastStats) return;
+      view.canvas.width = 1080;
+      view.canvas.height = 1080;
+      const ctx = view.canvas.getContext('2d');
+      if (!ctx) return;
+      const labels = formatResultLabels(lastStats);
+      drawResultCard(ctx, {
+        wpm: String(lastStats.wpm),
+        unitLabel: 'words per minute',
+        detailLabel: labels.detail,
+        rating: ratingFor(lastStats.wpm),
+      });
+    }
+
+    function showResult(stats: TypingStats, textIndex: number): void {
+      lastStats = stats;
+      const labels = formatResultLabels(stats);
+      view.readoutValue!.hidden = false;
+      view.readoutValue!.textContent = labels.readout;
+      view.note!.hidden = false;
+      view.note!.textContent = labels.note;
+      view.readout!.setAttribute('data-state', 'ok');
+      view.canvas!.hidden = false;
+      drawCardPreview();
+
+      // 结果首次出现的 180ms 过渡（AC-031）；prefers-reduced-motion 全局兜底。
+      view.readout!.classList.add('is-entering');
+      window.requestAnimationFrame(() => view.readout!.classList.remove('is-entering'));
+
+      view.copyButton!.disabled = false;
+      view.downloadButton!.disabled = false;
+      syncUrl({ textIndex, wpm: stats.wpm, accuracy: stats.accuracy, seconds: stats.seconds });
+    }
+
+    /** 把成绩写进地址栏（Copy link 的基础）；离开结果态时清掉。 */
+    function syncUrl(
+      result: { textIndex: number; wpm: number; accuracy: number; seconds: number } | null,
+    ): void {
+      const url = new URL(window.location.href);
+      url.search = result ? encodeResult(result).toString() : '';
+      window.history.replaceState(null, '', url);
+    }
+
+    function start(): void {
+      phase = 'running';
+      lastStats = null;
+      syncUrl(null);
+      buffer = buildTargetBuffer(passages, currentIndex, 1);
+      renderTrack();
+      view.input!.value = '';
+      view.input!.disabled = false;
+      paint(diffTyping(buffer.text, ''), 0);
+      setClock(DURATION_MS / 1000);
+      view.control!.textContent = 'End early';
+      renderPending('The timer is running. Press Escape to end early.');
+      // 点 Start（或按 Enter）后视口回到打字区，不让用户再手动找输入位置（AC-038）。
+      // 默认 instant 滚动——DESIGN.md §6-bis.7 禁滚动动画。
+      view.track!.scrollIntoView({ block: 'center' });
+      // 焦点跟到输入框（CR-001 用户要求）：disabled 解除后必须显式 focus，
+      // 否则焦点留在 Start 按钮上，按 Enter 会立刻触发 End early。
+      view.input!.focus();
+      startedAt = Date.now();
+      timerId = window.setInterval(tick, 200);
+    }
+
+    // ── 快捷键（CR-001 / AC-037）：Enter = 开始/再来一次，Escape = 提前结束 ──
+    // 焦点在按钮/链接上时不拦截，让原生激活生效（焦点在 Copy link 上按 Enter
+    // 必须还是复制，不能被全局快捷键劫持）。
+    window.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      const onActivator =
+        target !== null && (target.tagName === 'BUTTON' || target.tagName === 'A');
+      if (
+        event.key === 'Enter' &&
+        !onActivator &&
+        (phase === 'idle' || phase === 'shared' || phase === 'done')
+      ) {
+        event.preventDefault();
+        view.control!.click();
+      } else if (event.key === 'Escape' && phase === 'running') {
+        event.preventDefault();
+        finish();
+      }
+    });
+
+    function tick(): void {
+      const elapsed = Date.now() - startedAt;
+      setClock(Math.max(0, Math.ceil((DURATION_MS - elapsed) / 1000)));
+      if (elapsed >= DURATION_MS) finish();
+    }
+
+    /** typed 逼近 buffer 末尾时续接下一段（AC-018），计时不中断。 */
+    function extendBufferIfNeeded(): void {
+      if (!buffer || !needsMoreTarget(buffer.text.length, view.input!.value.length)) return;
+      buffer = {
+        text: buffer.text + passages[buffer.nextIndex]!,
+        nextIndex: (buffer.nextIndex + 1) % passages.length,
+      };
+      renderTrack();
+      paint(diffTyping(buffer.text, view.input!.value), view.input!.value.length);
+    }
+
+    function finish(): void {
+      window.clearInterval(timerId);
+      phase = 'done';
+      view.input!.disabled = true;
+      const elapsed = Math.min(Date.now() - startedAt, DURATION_MS);
+      setClock(Math.ceil((DURATION_MS - elapsed) / 1000));
+      view.control!.textContent = 'Try again';
+
+      const stats = computeStats(buffer?.text ?? '', view.input!.value, elapsed);
+      if (!stats.ok) {
+        // 无效样本：不结算、不出卡（BR-004），只给一行说明怎么改。
+        lastStats = null;
+        renderPending(stats.message);
+        syncUrl(null);
+        return;
+      }
+      showResult(stats.value, currentIndex);
+    }
+
+    function resetToIdle(nextIndex: number): void {
+      phase = 'idle';
+      currentIndex = ((nextIndex % passages.length) + passages.length) % passages.length;
+      lastStats = null;
+      buffer = buildTargetBuffer(passages, currentIndex, 1);
+      renderTrack();
+      view.input!.value = '';
+      view.input!.disabled = true;
+      view.input!.maxLength = buffer.text.length;
+      paint(diffTyping(buffer.text, ''), 0);
+      setClock(DURATION_MS / 1000);
+      view.control!.textContent = 'Start';
+      renderPending('Press Start or Enter, then type the text above as carefully as you can.');
+      syncUrl(null);
+    }
+
+    // ── 三态控制按钮（AC-032：Start / End early / Try again，同一位置）──
+    view.control!.addEventListener('click', () => {
+      if (phase === 'idle' || phase === 'shared') start();
+      else if (phase === 'running') finish();
+      else resetToIdle(currentIndex + 1);
+    });
+
+    // ── 输入：字符串即状态，退格/粘贴交给浏览器（AC-004 / 005 / 017）──
+    view.input!.addEventListener('input', () => {
+      if (phase !== 'running' || !buffer) return;
+      extendBufferIfNeeded();
+      paint(diffTyping(buffer.text, view.input!.value), view.input!.value.length);
+    });
+
+    // ── Copy link（AC-012）──
+    let copyResetTimer = 0;
+    function resetCopyLabelLater(): void {
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        view.copyButton!.textContent = 'Copy link';
+      }, 2000);
+    }
+    view.copyButton!.addEventListener('click', () => {
+      const write = navigator.clipboard?.writeText(window.location.href);
+      if (!write) {
+        view.copyButton!.textContent = 'Copying is not available in this browser';
+        resetCopyLabelLater();
+        return;
+      }
+      write
+        .then(() => {
+          view.copyButton!.textContent = 'Link copied';
+        })
+        .catch(() => {
+          view.copyButton!.textContent = 'Copying was blocked — copy the address bar link instead';
+        })
+        .finally(resetCopyLabelLater);
+    });
+
+    // ── Download image（AC-011）：1080×1080 PNG，与预览同一个 drawResultCard ──
+    view.downloadButton!.addEventListener('click', () => {
+      if (!lastStats) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1080;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        view.downloadButton!.textContent = 'Not available in this browser';
+        return;
+      }
+      const labels = formatResultLabels(lastStats);
+      drawResultCard(ctx, {
+        wpm: String(lastStats.wpm),
+        unitLabel: 'words per minute',
+        detailLabel: labels.detail,
+        rating: ratingFor(lastStats.wpm),
+      });
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          view.downloadButton!.textContent = 'Export failed — try again';
+          return;
+        }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `typing-${lastStats?.wpm ?? 0}wpm.png`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }, 'image/png');
+    });
+
+    // ── 分享链接：合法参数 → 直接还原同一张卡（AC-012）──
+    const shared = decodeResult(new URLSearchParams(window.location.search));
+    if (shared) {
+      phase = 'shared';
+      currentIndex = shared.textIndex;
+      buffer = buildTargetBuffer(passages, currentIndex, 1);
+      view.passageGroup!.setAttribute('data-live', '');
+      renderTrack();
+      view.input!.maxLength = buffer.text.length;
+      paint(diffTyping(buffer.text, ''), 0);
+      lastStats = {
+        wpm: shared.wpm,
+        accuracy: shared.accuracy,
+        correct: 0,
+        typed: 0,
+        seconds: shared.seconds,
+      };
+      const labels = formatResultLabels(lastStats);
+      view.readoutValue!.hidden = false;
+      view.readoutValue!.textContent = labels.readout;
+      view.note!.hidden = false;
+      view.note!.textContent = 'A shared result — press Try it yourself to try your own speed.';
+      view.readout!.setAttribute('data-state', 'ok');
+      view.canvas!.hidden = false;
+      drawCardPreview();
+      view.copyButton!.disabled = false;
+      view.downloadButton!.disabled = false;
+      view.control!.textContent = 'Try it yourself';
+      setClock(DURATION_MS / 1000);
+    } else {
+      resetToIdle(0);
+    }
+    // JS 接管后隐藏原始段落容器（无 JS 时第一段可见，AC-022）。
+    view.passageGroup!.setAttribute('data-live', '');
+  }
+
+  // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
+  try {
+    init();
+  } catch {
+    // 页面无 JS 时本来就完整可读（渐进增强），这里保持静默
+  }
+</script>
+
+<style>
+  /* 内置段落容器：无 JS 时显示第一段；JS 接管后整组隐藏 */
+  .typing-passages[data-live] .typing-passage {
+    display: none;
+  }
+
+  .typing-passages:not([data-live]) .typing-passage + .typing-passage {
+    display: none;
+  }
+
+  .typing-passages:not([data-live]) .typing-passage:first-child {
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .typing-stage {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .typing-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  /* 控制按钮贴着打字区（CR-001）：时钟在左，按钮推到行尾 */
+  .typing-meta .btn {
+    margin-left: auto;
+  }
+
+  /* 倒计时：--text-xl，不是结果读数字号（AC-028，BR-007） */
+  .typing-clock {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .typing-hint {
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+  }
+
+  .typing-track-wrap {
+    position: relative;
+  }
+
+  /* 打字区：普通英文句子，自然换行，不留粘贴框感 */
+  .typing-track {
+    min-height: 7.8em;
+    padding: var(--space-4) var(--space-5);
+    font-size: var(--text-lg);
+    line-height: 1.95;
+    color: var(--ink-muted);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* 字符 span 由 JS 运行时创建，不带 Astro 的 scoped 属性——必须 :global()，
+     否则着色样式全部落空（2026-09-28 浏览器验收实测踩坑） */
+  .typing-track :global(span) {
+    border-radius: 2px;
+  }
+
+  .typing-track :global(span.is-correct) {
+    color: var(--ink);
+  }
+
+  /* 错误态双载体：红 + 下划线（DESIGN.md §6-bis.9 第 10 条，AC-004） */
+  .typing-track :global(span.is-wrong) {
+    color: var(--danger);
+    background: var(--danger-wash);
+    text-decoration: underline;
+  }
+
+  .typing-track :global(span.is-cursor) {
+    background: var(--accent-wash);
+  }
+
+  /* 原位隐藏输入：opacity 0、盖满打字区、保留可聚焦性；16px 防 iOS 放大（AC-020） */
+  .typing-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    font-size: var(--text-base);
+    color: transparent;
+    background: transparent;
+    border: 0;
+    caret-color: transparent;
+  }
+
+  .typing-input:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-md);
+  }
+
+  /* 结果卡预览：与导出同一个 drawResultCard，正方形（AC-012） */
+  .typing-canvas {
+    display: block;
+    width: min(100%, 340px);
+    margin: var(--space-4) auto 0;
+    aspect-ratio: 1;
+  }
+
+  /* 结果首次出现的 180ms 过渡（AC-031）；prefers-reduced-motion 全局兜底 */
+  .readout {
+    transition:
+      opacity var(--dur-enter) var(--ease-out),
+      transform var(--dur-enter) var(--ease-out);
+  }
+
+  .readout.is-entering {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+</style>

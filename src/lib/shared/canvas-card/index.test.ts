@@ -240,3 +240,92 @@ describe('computeTeamCardLayout', () => {
     expect(laidOut[0]!.length).toBeLessThan(200);
   });
 });
+
+// ---------------------------------------------------------------------------
+// computeResultCardLayout / drawResultCard（队列 #3：打字测试成就卡）
+// ---------------------------------------------------------------------------
+
+import { computeResultCardLayout, drawResultCard } from './index';
+
+const resultContent = {
+  wpm: '62',
+  unitLabel: 'words per minute',
+  detailLabel: '97% accuracy · in 60 seconds',
+  rating: 'Fast',
+};
+
+describe('computeResultCardLayout', () => {
+  it('AC-011: lays out a 1080×1080 card', () => {
+    const layout = computeResultCardLayout(resultContent, fakeMeasureText);
+    expect(layout.width).toBe(1080);
+    expect(layout.height).toBe(1080);
+  });
+
+  it('AC-011: keeps the WPM number inside the card at any magnitude', () => {
+    for (const wpm of ['2', '62', '140', '300']) {
+      const layout = computeResultCardLayout({ ...resultContent, wpm }, fakeMeasureText);
+      expect(fakeMeasureText(wpm, layout.wpmPx)).toBeLessThanOrEqual(920);
+    }
+  });
+
+  it('AC-030: shrinks an overlong detail line instead of overflowing', () => {
+    // 现实中最长的 detail 来自提前结束：约 43 字符，40px 放不下就缩字号
+    const detailLabel = '100% accuracy · in 60 seconds, early finish';
+    const layout = computeResultCardLayout({ ...resultContent, detailLabel }, fakeMeasureText);
+    expect(layout.detailPx).toBeLessThan(40);
+    expect(fakeMeasureText(detailLabel, layout.detailPx)).toBeLessThanOrEqual(920);
+  });
+});
+
+describe('drawResultCard', () => {
+  /** 记录型假 ctx（与 tools/chart-maker/draw.test.ts 同一套路）：Node 无 canvas。 */
+  function createRecordingContext(): { ctx: CanvasRenderingContext2D; texts: string[] } {
+    const texts: string[] = [];
+    const ctx = {
+      fillStyle: '',
+      font: '',
+      textAlign: 'left',
+      textBaseline: 'alphabetic',
+      save(): void {},
+      restore(): void {},
+      fillRect(): void {},
+      fillText(text: string): void {
+        if (text.includes('NaN') || text.includes('Infinity')) {
+          throw new Error(`drew a broken number: ${text}`);
+        }
+        texts.push(text);
+      },
+      measureText(text: string): { width: number } {
+        return { width: text.length * 7 };
+      },
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, texts };
+  }
+
+  it('AC-011: draws every piece of the card including the site mark', () => {
+    const { ctx, texts } = createRecordingContext();
+    drawResultCard(ctx, resultContent);
+    expect(texts).toContain('PlainKit');
+    expect(texts).toContain('62');
+    expect(texts).toContain('words per minute');
+    expect(texts).toContain('97% accuracy · in 60 seconds');
+    expect(texts).toContain('Fast');
+  });
+
+  it('AC-029: prints no domain anywhere on the card', () => {
+    const { ctx, texts } = createRecordingContext();
+    drawResultCard(ctx, resultContent);
+    expect(
+      texts.some((text) => text.includes('http') || text.includes('.app') || text.includes('.io')),
+    ).toBe(false);
+  });
+
+  it('BR-004: survives the minimum valid run without broken numbers', () => {
+    const { ctx } = createRecordingContext();
+    drawResultCard(ctx, {
+      ...resultContent,
+      wpm: '3',
+      detailLabel: '100% accuracy · in 15 seconds',
+    });
+  });
+});
