@@ -158,40 +158,36 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
   /** 测试时长（BR-001）。 */
   const DURATION_MS = 60000;
 
+  /**
+   * 取必填元素；缺失直接抛给顶层 catch 静默降级——页面回到「无 JS 也可读」
+   * 的状态，与渐进增强语义一致（DESIGN.md §9.3）。用 throw 而不是一长串
+   * `if (!el) return`，是为了让下面所有元素都是非空常量，全文件零非空断言
+   * （DESIGN.md §341 禁止 `!`）。
+   */
+  function requireElement<T extends HTMLElement>(selector: string): T {
+    const element = document.querySelector<T>(selector);
+    if (element === null) throw new Error(`typing-test: missing element ${selector}`);
+    return element;
+  }
+
   function init(): void {
-    const view = {
-      passages: Array.from(document.querySelectorAll<HTMLParagraphElement>('.typing-passage')),
-      passageGroup: document.querySelector('#typing-passages') as HTMLDivElement | null,
-      track: document.querySelector('#typing-track') as HTMLDivElement | null,
-      input: document.querySelector('#typing-input') as HTMLInputElement | null,
-      clock: document.querySelector('#typing-clock') as HTMLParagraphElement | null,
-      readout: document.querySelector('#readout') as HTMLOutputElement | null,
-      readoutValue: document.querySelector('#readout-value') as HTMLParagraphElement | null,
-      note: document.querySelector('#readout-note') as HTMLParagraphElement | null,
-      canvas: document.querySelector('#typing-canvas') as HTMLCanvasElement | null,
-      control: document.querySelector('#test-control') as HTMLButtonElement | null,
-      copyButton: document.querySelector('#copy-link') as HTMLButtonElement | null,
-      downloadButton: document.querySelector('#download-image') as HTMLButtonElement | null,
-    };
-    if (
-      !view.passageGroup ||
-      !view.track ||
-      !view.input ||
-      !view.clock ||
-      !view.readout ||
-      !view.readoutValue ||
-      !view.note ||
-      !view.canvas ||
-      !view.control ||
-      !view.copyButton ||
-      !view.downloadButton ||
-      view.passages.length === 0
-    ) {
-      return;
-    }
+    const passageGroup = requireElement<HTMLDivElement>('#typing-passages');
+    const track = requireElement<HTMLDivElement>('#typing-track');
+    const input = requireElement<HTMLInputElement>('#typing-input');
+    const clock = requireElement<HTMLParagraphElement>('#typing-clock');
+    const readout = requireElement<HTMLOutputElement>('#readout');
+    const readoutValue = requireElement<HTMLParagraphElement>('#readout-value');
+    const note = requireElement<HTMLParagraphElement>('#readout-note');
+    const canvas = requireElement<HTMLCanvasElement>('#typing-canvas');
+    const control = requireElement<HTMLButtonElement>('#test-control');
+    const copyButton = requireElement<HTMLButtonElement>('#copy-link');
+    const downloadButton = requireElement<HTMLButtonElement>('#download-image');
+
+    const passageNodes = document.querySelectorAll<HTMLParagraphElement>('.typing-passage');
+    if (passageNodes.length === 0) throw new Error('typing-test: no passages in page');
 
     // 段落来自本页 HTML；规范化空白，杜绝源码缩进混进文本（BR-005）。
-    const passages = view.passages.map((element) =>
+    const passages = Array.from(passageNodes, (element) =>
       (element.textContent ?? '').replace(/\s+/g, ' ').trim(),
     );
 
@@ -205,12 +201,12 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
     let lastStats: TypingStats | null = null;
 
     function setClock(seconds: number): void {
-      view.clock!.textContent = String(seconds);
+      clock.textContent = String(seconds);
     }
 
     /** 把 buffer 渲染成字符 span（无 JS 时该区为空，段落原样可见，AC-022）。 */
     function renderTrack(): void {
-      if (!view.track || !buffer) return;
+      if (!buffer) return;
       const fragment = document.createDocumentFragment();
       spans = [];
       for (const character of buffer.text) {
@@ -219,14 +215,13 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
         fragment.appendChild(span);
         spans.push(span);
       }
-      view.track.replaceChildren(fragment);
-      view.input!.maxLength = buffer.text.length;
+      track.replaceChildren(fragment);
+      input.maxLength = buffer.text.length;
     }
 
     /** 按 diff 刷新着色；光标 = 下一个待打位置。 */
     function paint(diff: { states: string[] }, typedLength: number): void {
-      for (let i = 0; i < spans.length; i += 1) {
-        const span = spans[i]!;
+      for (const [i, span] of spans.entries()) {
         const state = diff.states[i] ?? 'pending';
         span.classList.toggle('is-correct', state === 'correct');
         span.classList.toggle('is-wrong', state === 'wrong');
@@ -235,13 +230,13 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
     }
 
     function renderPending(message: string): void {
-      view.readout!.setAttribute('data-state', 'pending');
-      view.readoutValue!.hidden = true;
-      view.canvas!.hidden = true;
-      view.note!.hidden = false;
-      view.note!.textContent = message;
-      view.copyButton!.disabled = true;
-      view.downloadButton!.disabled = true;
+      readout.setAttribute('data-state', 'pending');
+      readoutValue.hidden = true;
+      canvas.hidden = true;
+      note.hidden = false;
+      note.textContent = message;
+      copyButton.disabled = true;
+      downloadButton.disabled = true;
     }
 
     /** 预览与导出走同一个 drawResultCard（AC-011 / AC-012 / AC-029）。
@@ -249,10 +244,10 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
      *  drawResultCard 按 1080 布局，内部尺寸若跟随 CSS 宽度会把内容画到画布外
      *  （2026-09-28 浏览器验收实测踩坑）。 */
     function drawCardPreview(): void {
-      if (!view.canvas || !lastStats) return;
-      view.canvas.width = 1080;
-      view.canvas.height = 1080;
-      const ctx = view.canvas.getContext('2d');
+      if (!lastStats) return;
+      canvas.width = 1080;
+      canvas.height = 1080;
+      const ctx = canvas.getContext('2d');
       if (!ctx) return;
       const labels = formatResultLabels(lastStats);
       drawResultCard(ctx, {
@@ -266,20 +261,20 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
     function showResult(stats: TypingStats, textIndex: number): void {
       lastStats = stats;
       const labels = formatResultLabels(stats);
-      view.readoutValue!.hidden = false;
-      view.readoutValue!.textContent = labels.readout;
-      view.note!.hidden = false;
-      view.note!.textContent = labels.note;
-      view.readout!.setAttribute('data-state', 'ok');
-      view.canvas!.hidden = false;
+      readoutValue.hidden = false;
+      readoutValue.textContent = labels.readout;
+      note.hidden = false;
+      note.textContent = labels.note;
+      readout.setAttribute('data-state', 'ok');
+      canvas.hidden = false;
       drawCardPreview();
 
       // 结果首次出现的 180ms 过渡（AC-031）；prefers-reduced-motion 全局兜底。
-      view.readout!.classList.add('is-entering');
-      window.requestAnimationFrame(() => view.readout!.classList.remove('is-entering'));
+      readout.classList.add('is-entering');
+      window.requestAnimationFrame(() => readout.classList.remove('is-entering'));
 
-      view.copyButton!.disabled = false;
-      view.downloadButton!.disabled = false;
+      copyButton.disabled = false;
+      downloadButton.disabled = false;
       syncUrl({ textIndex, wpm: stats.wpm, accuracy: stats.accuracy, seconds: stats.seconds });
     }
 
@@ -298,18 +293,18 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       syncUrl(null);
       buffer = buildTargetBuffer(passages, currentIndex, 1);
       renderTrack();
-      view.input!.value = '';
-      view.input!.disabled = false;
+      input.value = '';
+      input.disabled = false;
       paint(diffTyping(buffer.text, ''), 0);
       setClock(DURATION_MS / 1000);
-      view.control!.textContent = 'End early';
+      control.textContent = 'End early';
       renderPending('The timer is running. Press Escape to end early.');
       // 点 Start（或按 Enter）后视口回到打字区，不让用户再手动找输入位置（AC-038）。
       // 默认 instant 滚动——DESIGN.md §6-bis.7 禁滚动动画。
-      view.track!.scrollIntoView({ block: 'center' });
+      track.scrollIntoView({ block: 'center' });
       // 焦点跟到输入框（CR-001 用户要求）：disabled 解除后必须显式 focus，
       // 否则焦点留在 Start 按钮上，按 Enter 会立刻触发 End early。
-      view.input!.focus();
+      input.focus();
       startedAt = Date.now();
       timerId = window.setInterval(tick, 200);
     }
@@ -328,7 +323,7 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
         (phase === 'idle' || phase === 'shared' || phase === 'done')
       ) {
         event.preventDefault();
-        view.control!.click();
+        control.click();
       } else if (event.key === 'Escape' && phase === 'running') {
         event.preventDefault();
         finish();
@@ -343,24 +338,26 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
 
     /** typed 逼近 buffer 末尾时续接下一段（AC-018），计时不中断。 */
     function extendBufferIfNeeded(): void {
-      if (!buffer || !needsMoreTarget(buffer.text.length, view.input!.value.length)) return;
+      if (!buffer || !needsMoreTarget(buffer.text.length, input.value.length)) return;
+      const next = passages[buffer.nextIndex];
+      if (next === undefined) return;
       buffer = {
-        text: buffer.text + passages[buffer.nextIndex]!,
+        text: buffer.text + next,
         nextIndex: (buffer.nextIndex + 1) % passages.length,
       };
       renderTrack();
-      paint(diffTyping(buffer.text, view.input!.value), view.input!.value.length);
+      paint(diffTyping(buffer.text, input.value), input.value.length);
     }
 
     function finish(): void {
       window.clearInterval(timerId);
       phase = 'done';
-      view.input!.disabled = true;
+      input.disabled = true;
       const elapsed = Math.min(Date.now() - startedAt, DURATION_MS);
       setClock(Math.ceil((DURATION_MS - elapsed) / 1000));
-      view.control!.textContent = 'Try again';
+      control.textContent = 'Try again';
 
-      const stats = computeStats(buffer?.text ?? '', view.input!.value, elapsed);
+      const stats = computeStats(buffer?.text ?? '', input.value, elapsed);
       if (!stats.ok) {
         // 无效样本：不结算、不出卡（BR-004），只给一行说明怎么改。
         lastStats = null;
@@ -377,28 +374,28 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       lastStats = null;
       buffer = buildTargetBuffer(passages, currentIndex, 1);
       renderTrack();
-      view.input!.value = '';
-      view.input!.disabled = true;
-      view.input!.maxLength = buffer.text.length;
+      input.value = '';
+      input.disabled = true;
+      input.maxLength = buffer.text.length;
       paint(diffTyping(buffer.text, ''), 0);
       setClock(DURATION_MS / 1000);
-      view.control!.textContent = 'Start';
+      control.textContent = 'Start';
       renderPending('Press Start or Enter, then type the text above as carefully as you can.');
       syncUrl(null);
     }
 
     // ── 三态控制按钮（AC-032：Start / End early / Try again，同一位置）──
-    view.control!.addEventListener('click', () => {
+    control.addEventListener('click', () => {
       if (phase === 'idle' || phase === 'shared') start();
       else if (phase === 'running') finish();
       else resetToIdle(currentIndex + 1);
     });
 
     // ── 输入：字符串即状态，退格/粘贴交给浏览器（AC-004 / 005 / 017）──
-    view.input!.addEventListener('input', () => {
+    input.addEventListener('input', () => {
       if (phase !== 'running' || !buffer) return;
       extendBufferIfNeeded();
-      paint(diffTyping(buffer.text, view.input!.value), view.input!.value.length);
+      paint(diffTyping(buffer.text, input.value), input.value.length);
     });
 
     // ── Copy link（AC-012）──
@@ -406,35 +403,35 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
     function resetCopyLabelLater(): void {
       window.clearTimeout(copyResetTimer);
       copyResetTimer = window.setTimeout(() => {
-        view.copyButton!.textContent = 'Copy link';
+        copyButton.textContent = 'Copy link';
       }, 2000);
     }
-    view.copyButton!.addEventListener('click', () => {
+    copyButton.addEventListener('click', () => {
       const write = navigator.clipboard?.writeText(window.location.href);
       if (!write) {
-        view.copyButton!.textContent = 'Copying is not available in this browser';
+        copyButton.textContent = 'Copying is not available in this browser';
         resetCopyLabelLater();
         return;
       }
       write
         .then(() => {
-          view.copyButton!.textContent = 'Link copied';
+          copyButton.textContent = 'Link copied';
         })
         .catch(() => {
-          view.copyButton!.textContent = 'Copying was blocked — copy the address bar link instead';
+          copyButton.textContent = 'Copying was blocked — copy the address bar link instead';
         })
         .finally(resetCopyLabelLater);
     });
 
     // ── Download image（AC-011）：1080×1080 PNG，与预览同一个 drawResultCard ──
-    view.downloadButton!.addEventListener('click', () => {
+    downloadButton.addEventListener('click', () => {
       if (!lastStats) return;
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
       canvas.height = 1080;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        view.downloadButton!.textContent = 'Not available in this browser';
+        downloadButton.textContent = 'Not available in this browser';
         return;
       }
       const labels = formatResultLabels(lastStats);
@@ -446,7 +443,7 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       });
       canvas.toBlob((blob) => {
         if (!blob) {
-          view.downloadButton!.textContent = 'Export failed — try again';
+          downloadButton.textContent = 'Export failed — try again';
           return;
         }
         const link = document.createElement('a');
@@ -463,9 +460,9 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       phase = 'shared';
       currentIndex = shared.textIndex;
       buffer = buildTargetBuffer(passages, currentIndex, 1);
-      view.passageGroup!.setAttribute('data-live', '');
+      passageGroup.setAttribute('data-live', '');
       renderTrack();
-      view.input!.maxLength = buffer.text.length;
+      input.maxLength = buffer.text.length;
       paint(diffTyping(buffer.text, ''), 0);
       lastStats = {
         wpm: shared.wpm,
@@ -475,22 +472,22 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
         seconds: shared.seconds,
       };
       const labels = formatResultLabels(lastStats);
-      view.readoutValue!.hidden = false;
-      view.readoutValue!.textContent = labels.readout;
-      view.note!.hidden = false;
-      view.note!.textContent = 'A shared result — press Try it yourself to try your own speed.';
-      view.readout!.setAttribute('data-state', 'ok');
-      view.canvas!.hidden = false;
+      readoutValue.hidden = false;
+      readoutValue.textContent = labels.readout;
+      note.hidden = false;
+      note.textContent = 'A shared result — press Try it yourself to try your own speed.';
+      readout.setAttribute('data-state', 'ok');
+      canvas.hidden = false;
       drawCardPreview();
-      view.copyButton!.disabled = false;
-      view.downloadButton!.disabled = false;
-      view.control!.textContent = 'Try it yourself';
+      copyButton.disabled = false;
+      downloadButton.disabled = false;
+      control.textContent = 'Try it yourself';
       setClock(DURATION_MS / 1000);
     } else {
       resetToIdle(0);
     }
     // JS 接管后隐藏原始段落容器（无 JS 时第一段可见，AC-022）。
-    view.passageGroup!.setAttribute('data-live', '');
+    passageGroup.setAttribute('data-live', '');
   }
 
   // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
