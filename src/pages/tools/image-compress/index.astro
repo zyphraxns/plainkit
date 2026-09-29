@@ -1,0 +1,1014 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const pageTitle = 'Compress images';
+const description =
+  'Shrink and convert JPG, PNG and WebP pictures in batches, right in your browser. Pick a quality, resize by longest edge, download the results. Free, no ads, nothing leaves your device.';
+const summary = 'Shrink photos and convert formats in batches — nothing leaves your device.';
+---
+
+<BaseLayout title={pageTitle} description={description} tool="image-compress">
+  <article class="tool" id="tool">
+    <header class="tool__head">
+      <p class="eyebrow">Pictures</p>
+      <h1 class="tool__title">{pageTitle}</h1>
+      <p class="tool__lead">{summary}</p>
+    </header>
+
+    <section class="bench">
+      <div class="bench__rule" aria-hidden="true"></div>
+
+      <div class="bench__fields">
+        <div class="bench__field">
+          <span class="bench__label" id="images-label">
+            Images
+          </span>
+          <div class="dropzone" id="dropzone" data-state="empty">
+            <p class="dropzone__text" id="dropzone-text">
+              Drop images here to start, or choose files. Up to 20 at a time.
+            </p>
+            <input
+              class="dropzone__input"
+              id="file"
+              name="file"
+              type="file"
+              accept="image/*,.heic,.heif"
+              multiple
+              aria-describedby="import-errors"
+            />
+          </div>
+          <ul class="import-errors" id="import-errors" role="status"></ul>
+        </div>
+
+        <div class="bench__field">
+          <span class="bench__label" id="format-label">
+            Output format
+          </span>
+          <div class="mode-switch" role="radiogroup" aria-labelledby="format-label">
+            <label class="mode-switch__option">
+              <input type="radio" name="format" value="jpeg" checked />
+              <span>JPG</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="format" value="png" />
+              <span>PNG</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="format" value="webp" />
+              <span>WebP</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="bench__field">
+          <label class="bench__label" for="quality">
+            Quality{' '}
+            <span class="bench__label-hint" id="quality-value">
+              80
+            </span>
+          </label>
+          <input
+            class="bench__input bench__input--range"
+            id="quality"
+            name="quality"
+            type="range"
+            min="1"
+            max="100"
+            step="1"
+            value="80"
+          />
+        </div>
+
+        <div class="bench__field">
+          <span class="bench__label" id="maxedge-label">
+            Longest edge
+          </span>
+          <div class="mode-switch" role="radiogroup" aria-labelledby="maxedge-label">
+            <label class="mode-switch__option">
+              <input type="radio" name="maxedge" value="" checked />
+              <span>Original</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="maxedge" value="3840" />
+              <span>3840 px</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="maxedge" value="1920" />
+              <span>1920 px</span>
+            </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="maxedge" value="1280" />
+              <span>1280 px</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <output class="readout" id="readout" aria-live="polite">
+        <p class="readout__label">Total size</p>
+        <p class="readout__value" id="readout-value" hidden></p>
+        <p class="readout__note" id="readout-note">
+          Compressed sizes appear here as each image is processed. Nothing is uploaded — everything
+          happens on your device.
+        </p>
+      </output>
+
+      <ul class="filelist" id="filelist"></ul>
+
+      <div class="tool__actions">
+        <button type="button" class="btn" data-variant="primary" id="copy-link" disabled>
+          Copy link
+        </button>
+        <button type="button" class="btn" id="download-all" disabled>
+          Download all
+        </button>
+      </div>
+    </section>
+
+    <section class="tool__notes">
+      <h2 class="tool__notes-title">How it works</h2>
+      <p class="tool__notes-body">
+        Each picture is re-encoded right in your browser with the quality and size you picked, so
+        the size you see is the size you get. Lower quality and a smaller longest edge both make the
+        file smaller — a smaller edge usually saves the most for photos.
+      </p>
+
+      <h2 class="tool__notes-title">Private by default</h2>
+      <p class="tool__notes-body">
+        Your pictures never leave your device — there is no server to send them to. Re-encoding also
+        removes hidden metadata, including the location where a photo was taken.
+      </p>
+
+      <h2 class="tool__notes-title">Good to know</h2>
+      <p class="tool__notes-body">
+        PNG has no quality slider because it is lossless. Animated GIFs are converted using their
+        first frame only. iPhone HEIC photos work in Safari; other browsers may not be able to open
+        them.
+      </p>
+    </section>
+  </article>
+</BaseLayout>
+
+<script>
+  import { href } from '@/lib/shared/paths';
+  import {
+    effectiveSettings,
+    formatBytes,
+    formatSummary,
+    isQualityApplicable,
+    resolveOutputFilename,
+    resolveOutputMime,
+    targetSize,
+    validateFiles,
+    type FileDesc,
+    type ImageSettings,
+    type OutputFormat,
+  } from '@/lib/tools/image-compress';
+
+  /** 设置变更后统一延迟重编码的等待时间（ms）。 */
+  const REENCODE_DELAY = 300;
+
+  interface ItemState {
+    id: number;
+    file: File;
+    override: Partial<ImageSettings> | null;
+    /** dirty = 需要按当前设置（重新）编码 */
+    dirty: boolean;
+    status: 'queued' | 'working' | 'done' | 'error';
+    errorMessage: string;
+    /** 原图的本地预览地址（缩略图用，编码不经过它） */
+    srcUrl: string;
+    /** 编码结果；done 之后才有 */
+    blob: Blob | null;
+    /** 结果对象地址（缩略图与下载共用），用完必须 revoke */
+    outUrl: string | null;
+    outSize: number;
+    outName: string;
+  }
+
+  function requireElement<T extends Element>(selector: string): T {
+    const el = document.querySelector<T>(selector);
+    if (!el) throw new Error(`image-compress: missing element ${selector}`);
+    return el;
+  }
+
+  function init(): void {
+    const dropzone = requireElement<HTMLElement>('#dropzone');
+    const dropzoneText = requireElement<HTMLElement>('#dropzone-text');
+    const fileInput = requireElement<HTMLInputElement>('#file');
+    const importErrors = requireElement<HTMLUListElement>('#import-errors');
+    const quality = requireElement<HTMLInputElement>('#quality');
+    const qualityValue = requireElement<HTMLElement>('#quality-value');
+    const readoutValue = requireElement<HTMLElement>('#readout-value');
+    const readoutNote = requireElement<HTMLElement>('#readout-note');
+    const filelist = requireElement<HTMLUListElement>('#filelist');
+    const copyButton = requireElement<HTMLButtonElement>('#copy-link');
+    const downloadAllButton = requireElement<HTMLButtonElement>('#download-all');
+
+    let items: ItemState[] = [];
+    let nextId = 1;
+    let reencodeTimer = 0;
+    let queueTail: Promise<void> = Promise.resolve();
+    let copyResetTimer = 0;
+
+    /** 浏览器能编码的输出格式（1×1 canvas 探测，技术方案 §4）。 */
+    const supportedFormats: OutputFormat[] = (() => {
+      const probe = document.createElement('canvas');
+      probe.width = 1;
+      probe.height = 1;
+      const formats: OutputFormat[] = ['jpeg', 'png'];
+      if (probe.toDataURL('image/webp').startsWith('data:image/webp')) formats.push('webp');
+      return formats;
+    })();
+
+    // ── 设置读取 ────────────────────────────────────────────────
+    function checkedRadio(name: string): HTMLInputElement {
+      const el = document.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`);
+      if (!el) throw new Error(`image-compress: no checked radio for ${name}`);
+      return el;
+    }
+
+    function readGlobal(): ImageSettings {
+      const maxRaw = checkedRadio('maxedge').value;
+      return {
+        format: checkedRadio('format').value as OutputFormat,
+        quality: Number(quality.value),
+        maxEdge: maxRaw === '' ? null : Number(maxRaw),
+      };
+    }
+
+    function readFormat(): OutputFormat {
+      return checkedRadio('format').value as OutputFormat;
+    }
+
+    // ── 渲染 ───────────────────────────────────────────────────
+    function renderImportErrors(
+      rejected: { item: FileDesc; reason: string }[],
+      truncated: boolean,
+    ): void {
+      importErrors.textContent = '';
+      for (const { item, reason } of rejected) {
+        const li = document.createElement('li');
+        li.textContent =
+          reason === 'too-large'
+            ? `"${item.name}" is larger than 30 MB and was skipped.`
+            : `"${item.name}" is not an image and was skipped.`;
+        importErrors.appendChild(li);
+      }
+      if (truncated) {
+        const li = document.createElement('li');
+        li.textContent = 'Only the first 20 images were added.';
+        importErrors.appendChild(li);
+      }
+    }
+
+    function rowSizeText(item: ItemState): string {
+      if (item.status === 'error') return item.errorMessage;
+      if (item.status === 'working') return 'Processing…';
+      if (item.status === 'queued') return 'Waiting…';
+      const before = formatBytes(item.file.size);
+      const after = formatBytes(item.outSize);
+      return `${before} → ${after}`;
+    }
+
+    function renderRow(item: ItemState): void {
+      const row = filelist.querySelector<HTMLLIElement>(`[data-id="${item.id}"]`);
+      if (!row) return;
+      const size = row.querySelector<HTMLElement>('.filerow__size');
+      if (size) {
+        size.textContent = rowSizeText(item);
+        size.dataset.state = item.status;
+      }
+      const thumb = row.querySelector<HTMLImageElement>('.filerow__thumb');
+      if (thumb && item.status === 'done' && item.outUrl && thumb.dataset.src === 'original') {
+        thumb.src = item.outUrl;
+        thumb.dataset.src = 'output';
+      }
+      const download = row.querySelector<HTMLButtonElement>('.filerow__download');
+      if (download) download.disabled = item.status !== 'done';
+      const qualityInput = row.querySelector<HTMLInputElement>('.filerow__quality');
+      if (qualityInput) {
+        qualityInput.disabled = !isQualityApplicable(
+          `image/${
+            row.querySelector<HTMLSelectElement>('.filerow__format')?.value || readGlobal().format
+          }`,
+        );
+      }
+    }
+
+    function renderReadout(): void {
+      const done = items.filter((item) => item.status === 'done');
+      if (done.length === 0) {
+        readoutValue.hidden = true;
+        readoutNote.hidden = false;
+        return;
+      }
+      const before = done.reduce((sum, item) => sum + item.file.size, 0);
+      const after = done.reduce((sum, item) => sum + item.outSize, 0);
+      readoutValue.textContent = formatSummary(before, after);
+      readoutValue.hidden = false;
+      readoutNote.hidden = true;
+    }
+
+    function renderActions(): void {
+      const done = items.some((item) => item.status === 'done');
+      copyButton.disabled = false; // Copy link 任何时候可用（AC-018）
+      downloadAllButton.disabled = !done;
+    }
+
+    function buildRow(item: ItemState): HTMLLIElement {
+      const li = document.createElement('li');
+      li.className = 'filerow';
+      li.dataset.id = String(item.id);
+
+      const thumb = document.createElement('img');
+      thumb.className = 'filerow__thumb';
+      thumb.src = item.srcUrl;
+      thumb.dataset.src = 'original';
+      thumb.alt = '';
+      thumb.width = 56;
+      thumb.height = 56;
+      thumb.loading = 'lazy';
+
+      const info = document.createElement('div');
+      info.className = 'filerow__info';
+
+      const name = document.createElement('p');
+      name.className = 'filerow__name';
+      name.textContent = item.file.name;
+
+      const size = document.createElement('p');
+      size.className = 'filerow__size';
+      size.textContent = rowSizeText(item);
+      size.dataset.state = item.status;
+
+      info.append(name, size);
+
+      const adjust = buildAdjust(item);
+
+      const download = document.createElement('button');
+      download.type = 'button';
+      download.className = 'filerow__download';
+      download.textContent = 'Download';
+      download.disabled = item.status !== 'done';
+      download.addEventListener('click', () => downloadItem(item));
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'filerow__remove';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label', `Remove ${item.file.name}`);
+      remove.addEventListener('click', () => removeItem(item.id));
+
+      li.append(thumb, info, adjust, download, remove);
+      return li;
+    }
+
+    /**
+     * 单张覆盖设置（AC-003）：空值 = 跟随全局；reset 清掉全部覆盖。
+     * 控件初值只反映「当前覆盖」，不跟随全局实时变化——生效值始终以
+     * effectiveSettings(global, override) 为准。
+     */
+    function buildAdjust(item: ItemState): HTMLDetailsElement {
+      const details = document.createElement('details');
+      details.className = 'filerow__adjust';
+
+      const summary = document.createElement('summary');
+      summary.textContent = 'Adjust';
+      details.appendChild(summary);
+
+      const body = document.createElement('div');
+      body.className = 'filerow__adjust-body';
+
+      const formatLabel = document.createElement('label');
+      formatLabel.append('Format ');
+      const format = document.createElement('select');
+      format.className = 'filerow__format';
+      for (const [value, text] of [
+        ['', 'Follow global'],
+        ['jpeg', 'JPG'],
+        ['png', 'PNG'],
+        ['webp', 'WebP'],
+      ] as const) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        if (value !== '' && item.override?.format === value) option.selected = true;
+        format.appendChild(option);
+      }
+      formatLabel.append(format);
+
+      const qualityLabel = document.createElement('label');
+      qualityLabel.append('Quality ');
+      const rowQuality = document.createElement('input');
+      rowQuality.type = 'range';
+      rowQuality.className = 'filerow__quality';
+      rowQuality.min = '1';
+      rowQuality.max = '100';
+      rowQuality.value = String(item.override?.quality ?? readGlobal().quality);
+      qualityLabel.append(rowQuality);
+
+      const edgeLabel = document.createElement('label');
+      edgeLabel.append('Longest edge ');
+      const edge = document.createElement('select');
+      edge.className = 'filerow__maxedge';
+      for (const [value, text] of [
+        ['', 'Follow global'],
+        ['orig', 'Original'],
+        ['3840', '3840 px'],
+        ['1920', '1920 px'],
+        ['1280', '1280 px'],
+      ] as const) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        const current = item.override?.maxEdge;
+        if (
+          (current === null && value === 'orig') ||
+          (typeof current === 'number' && String(current) === value)
+        ) {
+          option.selected = true;
+        }
+        edge.appendChild(option);
+      }
+      edgeLabel.append(edge);
+
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'filerow__reset';
+      reset.textContent = 'Reset to global';
+      reset.addEventListener('click', () => {
+        item.override = null;
+        format.value = '';
+        edge.value = '';
+        rowQuality.value = String(readGlobal().quality);
+        scheduleItem(item);
+      });
+
+      format.addEventListener('change', () => {
+        item.override = withOverride(item, {
+          format: (format.value || undefined) as OutputFormat | undefined,
+        });
+        renderRow(item);
+        scheduleItem(item);
+      });
+      rowQuality.addEventListener('input', () => {
+        item.override = withOverride(item, { quality: Number(rowQuality.value) });
+        scheduleItem(item);
+      });
+      edge.addEventListener('change', () => {
+        const raw = edge.value;
+        const maxEdge = raw === '' ? undefined : raw === 'orig' ? null : Number(raw);
+        item.override = withOverride(item, { maxEdge });
+        scheduleItem(item);
+      });
+
+      body.append(formatLabel, qualityLabel, edgeLabel, reset);
+      details.appendChild(body);
+      return details;
+    }
+
+    /**
+     * 把一次覆盖合并进 item.override。patch 里 undefined = 清掉该键
+     * （跟随全局）；maxEdge 的 null 是合法值（Original）。全部键清空时
+     * 返回 null（完全跟随全局）。
+     */
+    function withOverride(
+      item: ItemState,
+      patch: Record<string, OutputFormat | number | null | undefined>,
+    ): Partial<ImageSettings> | null {
+      const merged: Record<string, OutputFormat | number | null | undefined> = {
+        ...(item.override ?? {}),
+      };
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === undefined) delete merged[key];
+        else merged[key] = value;
+      }
+      const cleaned: Partial<ImageSettings> = {};
+      if (typeof merged.format === 'string') cleaned.format = merged.format;
+      if (typeof merged.quality === 'number') cleaned.quality = merged.quality;
+      if (merged.maxEdge === null || typeof merged.maxEdge === 'number') {
+        cleaned.maxEdge = merged.maxEdge;
+      }
+      return Object.keys(cleaned).length > 0 ? cleaned : null;
+    }
+
+    function scheduleItem(item: ItemState): void {
+      item.dirty = true;
+      scheduleReencodeAll();
+    }
+
+    /** 单张下载：结果对象地址 + lib 决定的文件名（AC-004）。 */
+    function downloadItem(item: ItemState): void {
+      if (item.status !== 'done' || !item.outUrl) return;
+      const link = document.createElement('a');
+      link.href = item.outUrl;
+      link.download = item.outName;
+      link.click();
+    }
+
+    // ── 列表操作 ───────────────────────────────────────────────
+    function removeItem(id: number): void {
+      const item = items.find((entry) => entry.id === id);
+      if (!item) return;
+      items = items.filter((entry) => entry.id !== id);
+      URL.revokeObjectURL(item.srcUrl);
+      if (item.outUrl) URL.revokeObjectURL(item.outUrl);
+      filelist.querySelector(`[data-id="${id}"]`)?.remove();
+      renderReadout();
+      renderActions();
+      if (items.length === 0) {
+        dropzone.dataset.state = 'empty';
+        dropzoneText.textContent =
+          'Drop images here to start, or choose files. Up to 20 at a time.';
+      }
+    }
+
+    function addFiles(files: File[]): void {
+      const descs: FileDesc[] = files.map((file) => ({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      }));
+      const result = validateFiles(descs);
+      renderImportErrors(result.rejected, result.truncated);
+
+      for (const desc of result.accepted) {
+        const file = files.find((candidate) => candidate.name === desc.name)!;
+        const item: ItemState = {
+          id: nextId++,
+          file,
+          override: null,
+          dirty: true,
+          status: 'queued',
+          errorMessage: '',
+          srcUrl: URL.createObjectURL(file),
+          blob: null,
+          outUrl: null,
+          outSize: 0,
+          outName: '',
+        };
+        items.push(item);
+        filelist.appendChild(buildRow(item));
+        enqueue(item);
+      }
+
+      if (items.length > 0) {
+        dropzone.dataset.state = 'loaded';
+        dropzoneText.textContent = 'Add more images — drop them here or choose files.';
+      }
+      renderActions();
+    }
+
+    // ── 编码管线（技术方案 §2：真实编码 + 串行队列 + 内存即用即释）──
+    function decode(file: File): Promise<HTMLImageElement> {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(img);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('decode'));
+        };
+        img.src = url;
+      });
+    }
+
+    function encodeCanvas(
+      canvas: HTMLCanvasElement,
+      mime: string,
+      qualityValue: number | undefined,
+    ): Promise<Blob | null> {
+      return new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), mime, qualityValue);
+      });
+    }
+
+    async function processItem(item: ItemState): Promise<void> {
+      const settings = effectiveSettings(readGlobal(), item.override);
+      const mime = `image/${resolveOutputMime(settings.format, supportedFormats)}`;
+      item.status = 'working';
+      renderRow(item);
+      try {
+        const img = await decode(item.file);
+        const size = targetSize(img.naturalWidth, img.naturalHeight, settings.maxEdge);
+        const canvas = document.createElement('canvas');
+        canvas.width = size.w;
+        canvas.height = size.h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('canvas');
+        ctx.drawImage(img, 0, 0, size.w, size.h);
+
+        const encoderQuality = isQualityApplicable(mime) ? settings.quality / 100 : undefined;
+        const blob = await encodeCanvas(canvas, mime, encoderQuality);
+        if (!blob) throw new Error('encode');
+
+        if (item.outUrl) URL.revokeObjectURL(item.outUrl);
+        item.blob = blob;
+        item.outUrl = URL.createObjectURL(blob);
+        item.outSize = blob.size;
+        item.outName = resolveOutputFilename(item.file.name, mime);
+        item.status = 'done';
+      } catch {
+        item.status = 'error';
+        item.errorMessage =
+          'This image cannot be processed in this browser. HEIC photos need Safari — others: try a JPG, PNG or WebP.';
+      }
+      renderRow(item);
+      renderReadout();
+      renderActions();
+    }
+
+    function enqueue(item: ItemState): void {
+      item.status = 'queued';
+      queueTail = queueTail.then(() => processItem(item)).catch(() => {});
+    }
+
+    /** 设置变更：全部条目标脏，防抖后按新设置逐张重编码。 */
+    function scheduleReencodeAll(): void {
+      window.clearTimeout(reencodeTimer);
+      reencodeTimer = window.setTimeout(() => {
+        for (const item of items) {
+          if (!item.dirty) continue;
+          item.dirty = false;
+          enqueue(item);
+        }
+      }, REENCODE_DELAY);
+    }
+
+    // ── 事件绑定 ───────────────────────────────────────────────
+    for (const eventName of ['dragover', 'dragenter'] as const) {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.dataset.state = 'dragover';
+      });
+    }
+    for (const eventName of ['dragleave', 'drop'] as const) {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.dataset.state = items.length > 0 ? 'loaded' : 'empty';
+      });
+    }
+    dropzone.addEventListener('drop', (event) => {
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (files.length > 0) addFiles(files);
+    });
+
+    fileInput.addEventListener('change', () => {
+      const files = Array.from(fileInput.files ?? []);
+      if (files.length > 0) addFiles(files);
+      fileInput.value = '';
+    });
+
+    for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="format"]')) {
+      radio.addEventListener('change', () => {
+        updateQualityField();
+        markAllDirty();
+      });
+    }
+    quality.addEventListener('input', () => {
+      qualityValue.textContent = quality.value;
+      markAllDirty();
+    });
+    for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="maxedge"]')) {
+      radio.addEventListener('change', markAllDirty);
+    }
+
+    function markAllDirty(): void {
+      if (items.length === 0) return;
+      for (const item of items) item.dirty = true;
+      scheduleReencodeAll();
+    }
+
+    /** PNG 输出没有质量参数（AC-015）。 */
+    function updateQualityField(): void {
+      const disabled = !isQualityApplicable(`image/${readFormat()}`);
+      quality.disabled = disabled;
+      qualityValue.textContent = disabled ? 'lossless' : quality.value;
+    }
+
+    // ── Copy link（AC-018 / BR-005）────────────────────────────
+    function resetCopyLabelLater(): void {
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        copyButton.textContent = 'Copy link';
+      }, 2000);
+    }
+
+    copyButton.addEventListener('click', () => {
+      const url = new URL(window.location.origin + href('tools/image-compress/'));
+      const write = navigator.clipboard?.writeText(url.href);
+      if (!write) {
+        copyButton.textContent = 'Copying is not available in this browser';
+        resetCopyLabelLater();
+        return;
+      }
+      write
+        .then(() => {
+          copyButton.textContent = 'Link copied';
+        })
+        .catch(() => {
+          copyButton.textContent = 'Copying was blocked — copy the address bar link instead';
+        })
+        .finally(resetCopyLabelLater);
+    });
+
+    // ── Download all（AC-005）：逐个触发，间隔避免被浏览器拦掉 ──
+    downloadAllButton.addEventListener('click', async () => {
+      for (const item of items.filter((entry) => entry.status === 'done')) {
+        downloadItem(item);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    });
+
+    updateQualityField();
+  }
+
+  // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
+  try {
+    init();
+  } catch {
+    // 渐进增强：页面无 JS 时说明区仍完整可读
+  }
+</script>
+
+<style>
+  .bench__label-hint {
+    font-weight: 400;
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dropzone {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--bg);
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-sm);
+    transition:
+      border-color var(--dur-state) var(--ease-out),
+      background-color var(--dur-state) var(--ease-out);
+  }
+
+  .dropzone[data-state='dragover'] {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .dropzone__input {
+    font-size: var(--text-sm);
+  }
+
+  .import-errors {
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .import-errors:empty {
+    display: none;
+  }
+</style>
+
+<style is:global>
+  /* 以下样式作用于 JS 动态创建的元素（date-duration 先例：scoped 样式
+     只作用于模板静态元素，动态元素必须 is:global；类名均带前缀防冲突）。 */
+  .import-errors li {
+    font-size: var(--text-sm);
+    color: var(--danger);
+  }
+
+  .bench__input--range {
+    padding: 0;
+    accent-color: var(--accent);
+  }
+
+  .bench__input--range:disabled {
+    opacity: 0.5;
+  }
+
+  .mode-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .mode-switch__option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition:
+      border-color var(--dur-state) var(--ease-out),
+      background-color var(--dur-state) var(--ease-out);
+  }
+
+  .mode-switch__option:hover {
+    border-color: var(--ink-faint);
+  }
+
+  .mode-switch__option:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .mode-switch__option input {
+    accent-color: var(--accent);
+  }
+
+  .filelist {
+    margin: var(--space-4) 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .filelist:empty {
+    display: none;
+  }
+
+  .filerow {
+    /* grid item 默认 min-width:auto 会用长文件名把整行撑出工作台，ellipsis 永不触发，必须显式允许收缩到 0 */
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+  }
+
+  .filerow__thumb {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  .filerow__info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .filerow__name {
+    margin: 0;
+    font-size: var(--text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .filerow__size {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .filerow__size[data-state='done'] {
+    color: var(--accent);
+  }
+
+  .filerow__size[data-state='error'] {
+    color: var(--danger);
+  }
+
+  .filerow__download {
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition:
+      border-color var(--dur-state) var(--ease-out),
+      background-color var(--dur-state) var(--ease-out);
+  }
+
+  .filerow__download:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .filerow__download:disabled {
+    color: var(--ink-faint);
+    cursor: default;
+  }
+
+  .filerow__adjust {
+    flex-shrink: 0;
+  }
+
+  .filerow__adjust summary {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .filerow__adjust summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .filerow__adjust summary::before {
+    content: '▸ ';
+  }
+
+  .filerow__adjust[open] summary::before {
+    content: '▾ ';
+  }
+
+  .filerow__adjust-body {
+    position: absolute;
+    z-index: var(--z-overlay);
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+  }
+
+  .filerow {
+    position: relative;
+  }
+
+  .filerow__adjust-body label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .filerow__adjust-body select {
+    font-size: var(--text-sm);
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  .filerow__adjust-body input[type='range'] {
+    accent-color: var(--accent);
+  }
+
+  .filerow__adjust-body input[type='range']:disabled {
+    opacity: 0.5;
+  }
+
+  .filerow__reset {
+    border: 0;
+    padding: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+    text-decoration: underline;
+    text-align: left;
+  }
+
+  .filerow__remove {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: none;
+    color: var(--ink-muted);
+    font-size: var(--text-xl);
+    line-height: 1;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: color var(--dur-state) var(--ease-out);
+  }
+
+  .filerow__remove:hover {
+    color: var(--danger);
+  }
+</style>

@@ -85,6 +85,12 @@ export const TOOLS: readonly ToolEntry[] = [
     category: 'Pictures',
   },
   {
+    slug: 'image-compress',
+    title: 'Compress images',
+    summary: 'Shrink and convert pictures in batches, on your device.',
+    category: 'Pictures',
+  },
+  {
     slug: 'typing-test',
     title: 'Typing speed test',
     summary: 'Measure your typing speed and get a result card.',
