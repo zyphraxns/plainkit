@@ -1,15 +1,17 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 
+import { BASE_PATH as base, SITE } from './scripts/site.config.mjs';
+
 // 同一份代码、两套部署：
 //   Cloudflare Pages（主站）  BASE_PATH=/
 //   GitHub Pages（镜像）      BASE_PATH=/<仓库名>/
-const base = process.env.BASE_PATH ?? '/';
+// 站点地址与基路径的唯一来源在 scripts/site.config.mjs（sitemap 生成脚本也读它）。
 
 export default defineConfig({
-  // 只用于生成绝对 URL（站内目前没有 canonical / OG / sitemap，占位不构成风险）。
-  // 当前实际访问地址是 GitHub Pages 镜像；正式域名确定后改这一行。
-  site: 'https://zyphraxns.github.io',
+  // 用于生成绝对 URL：sitemap.xml / robots.txt 由 scripts/generate-sitemap.mjs 产出。
+  // 当前实际访问地址是 GitHub Pages 镜像；正式域名确定后改 site.config.mjs 里的 SITE。
+  site: SITE,
   base,
   output: 'static',
   trailingSlash: 'always',
