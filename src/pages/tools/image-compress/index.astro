@@ -764,6 +764,9 @@ const summary = 'Shrink photos and convert formats in batches — nothing leaves
 
   .dropzone__input {
     font-size: var(--text-sm);
+    /* file input 有固有宽度，窄屏必须允许收缩，否则溢出工作台 */
+    min-width: 0;
+    max-width: 100%;
   }
 
   .import-errors {

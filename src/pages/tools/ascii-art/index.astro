@@ -443,6 +443,9 @@ const summary = 'Turn a picture into ASCII character art — copy the text or do
 
   .dropzone__input {
     font-size: var(--text-sm);
+    /* file input 有固有宽度，窄屏必须允许收缩，否则溢出工作台 */
+    min-width: 0;
+    max-width: 100%;
   }
 
   .bench__field--inline {

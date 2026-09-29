@@ -292,8 +292,15 @@ code {
 }
 
 .bench__field {
+  /* 窄屏下字段内容（如 file input 的固有宽度）不得把字段撑出工作台：
+     grid item 默认 min-width:auto 会拒绝收缩，必须显式放开 */
+  min-width: 0;
   display: grid;
   gap: var(--space-2);
+}
+
+.bench__field > * {
+  min-width: 0;
 }
 
 .bench__label {
