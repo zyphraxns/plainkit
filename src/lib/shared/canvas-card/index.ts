@@ -600,3 +600,158 @@ export function drawResultCard(ctx: CanvasRenderingContext2D, content: ResultCar
 
   ctx.restore();
 }
+
+// ---------------------------------------------------------------------------
+// random-picker 转盘模式：揭晓卡（specs/features/random-picker-wheel.md AC-048）
+// ---------------------------------------------------------------------------
+
+/** 揭晓卡需要的内容；文案由逻辑层算好，绘制层不拼字符串。 */
+export interface RevealCardContent {
+  /** 顶部小标题（如 "Picked"）；空串 = 不渲染 */
+  title: string;
+  /** 中签名字——卡片上最大的元素 */
+  name: string;
+  /** 副标题（如 "Out of 23 names"） */
+  note: string;
+  dateLabel: string;
+}
+
+export interface RevealCardLayout {
+  width: number;
+  height: number;
+  /** 自适应后的名字字号（上限 120） */
+  nameSize: number;
+  /** 折行后的名字行 */
+  nameLines: string[];
+  /** 名字第一行的基线 y */
+  nameBaseline: number;
+  /** 行高（按字号比例算） */
+  lineHeight: number;
+  /** 副标题与日期的基线 y */
+  noteBaseline: number;
+  dateBaseline: number;
+}
+
+/** 名字字号的两档边界：短名顶到 120，放不下时降到 40 再折行。 */
+const REVEAL_NAME_MAX = 120;
+const REVEAL_NAME_MIN = 40;
+/** 揭晓卡最小高度——方一点才像一张「结果卡」。 */
+const REVEAL_MIN_HEIGHT = 720;
+
+/**
+ * 按空格折行；单个词本身就超宽时按码点硬切（名字可能没有任何空格）。
+ */
+function wrapName(name: string, maxWidth: number, px: number, measure: MeasureTextAt): string[] {
+  const lines: string[] = [];
+  const push = (line: string): void => {
+    if (line !== '') lines.push(line);
+  };
+
+  for (const word of name.split(' ').filter((part) => part !== '')) {
+    if (measure(word, px) > maxWidth) {
+      // 单个词本身就超宽（名字可能没有任何空格）：按码点硬切，不切代理对
+      let chunk = '';
+      for (const char of [...word]) {
+        if (chunk !== '' && measure(chunk + char, px) > maxWidth) {
+          push(chunk);
+          chunk = char;
+        } else {
+          chunk += char;
+        }
+      }
+      push(chunk);
+      continue;
+    }
+    const last = lines[lines.length - 1];
+    if (last !== undefined && measure(`${last} ${word}`, px) <= maxWidth) {
+      lines[lines.length - 1] = `${last} ${word}`;
+    } else {
+      lines.push(word);
+    }
+  }
+
+  return lines.length > 0 ? lines : [name];
+}
+
+/**
+ * 计算揭晓卡排版：宽 1080、高按内容增长（最小 720）。
+ *
+ * 纯函数——度量通过 `measure` 注入（与其余卡片同一套路）。
+ */
+export function computeRevealCardLayout(
+  content: RevealCardContent,
+  measure: MeasureTextAt,
+): RevealCardLayout {
+  const width = 1080;
+  const maxTextWidth = width - 160;
+  const nameSize = fitTextSize(maxTextWidth, REVEAL_NAME_MAX, REVEAL_NAME_MIN, (px) =>
+    measure(content.name, px),
+  );
+  const nameLines = wrapName(content.name, maxTextWidth, nameSize, measure);
+  const lineHeight = Math.round(nameSize * 1.18);
+
+  const nameBaseline = content.title === '' ? 380 : 330;
+  const nameBottom = nameBaseline + (nameLines.length - 1) * lineHeight;
+  const noteBaseline = nameBottom + 110;
+  const dateBaseline = noteBaseline + 64;
+  const height = Math.max(REVEAL_MIN_HEIGHT, dateBaseline + 120);
+
+  return {
+    width,
+    height,
+    nameSize,
+    nameLines,
+    nameBaseline,
+    lineHeight,
+    noteBaseline,
+    dateBaseline,
+  };
+}
+
+/**
+ * 绘制转盘揭晓卡：小标题 → 大字中签名字 → 参与人数 → 日期 → PlainKit。
+ *
+ * 调用方负责创建画布（含 2 倍分辨率处理）与下载/展示。
+ */
+export function drawRevealCard(ctx: CanvasRenderingContext2D, content: RevealCardContent): void {
+  const measure: MeasureTextAt = (text, px) => {
+    ctx.font = `400 ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    return ctx.measureText(text).width;
+  };
+  const layout = computeRevealCardLayout(content, measure);
+  const colors = CARD_THEMES.light;
+  const FONT = (px: number, weight = 400) =>
+    `${weight} ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+
+  ctx.save();
+  ctx.fillStyle = colors.background;
+  ctx.fillRect(0, 0, layout.width, layout.height);
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center';
+
+  if (content.title !== '') {
+    ctx.font = FONT(56, 600);
+    ctx.fillStyle = colors.accent;
+    ctx.fillText(content.title, layout.width / 2, 150);
+  }
+
+  ctx.font = FONT(layout.nameSize, 600);
+  ctx.fillStyle = colors.ink;
+  layout.nameLines.forEach((line, index) => {
+    ctx.fillText(line, layout.width / 2, layout.nameBaseline + index * layout.lineHeight);
+  });
+
+  ctx.font = FONT(44);
+  ctx.fillStyle = colors.muted;
+  ctx.fillText(content.note, layout.width / 2, layout.noteBaseline);
+
+  ctx.font = FONT(36);
+  ctx.fillText(content.dateLabel, layout.width / 2, layout.dateBaseline);
+
+  // 站点标识：右下角，不带域名（2026-09-25 裁定）。
+  ctx.font = FONT(30, 500);
+  ctx.textAlign = 'right';
+  ctx.fillText('PlainKit', layout.width - 80, layout.height - 70);
+
+  ctx.restore();
+}

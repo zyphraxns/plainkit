@@ -329,3 +329,117 @@ describe('drawResultCard', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// computeRevealCardLayout / drawRevealCard（random-picker 转盘揭晓卡）
+// ---------------------------------------------------------------------------
+
+import { computeRevealCardLayout, drawRevealCard } from './index';
+
+// 复用文件顶部已有的双参数假测量器 fakeMeasureText（每个字符 0.6 × 字号）。
+
+const revealContent = {
+  title: 'Picked',
+  name: 'Alice',
+  note: 'Out of 23 names',
+  dateLabel: 'September 29, 2026',
+};
+
+describe('computeRevealCardLayout', () => {
+  it('AC-048: keeps the shared card width and a tall enough canvas', () => {
+    const layout = computeRevealCardLayout(revealContent, fakeMeasureText);
+    expect(layout.width).toBe(1080);
+    expect(layout.height).toBeGreaterThanOrEqual(720);
+  });
+
+  it('AC-048: blows a short name up to the maximum size on one line', () => {
+    const layout = computeRevealCardLayout(revealContent, fakeMeasureText);
+    expect(layout.nameSize).toBe(120);
+    expect(layout.nameLines).toEqual(['Alice']);
+  });
+
+  it('AC-048: drops the size and wraps a name that cannot fit in one line', () => {
+    const layout = computeRevealCardLayout(
+      { ...revealContent, name: 'x'.repeat(40) },
+      fakeMeasureText,
+    );
+    expect(layout.nameSize).toBeLessThan(120);
+    expect(layout.nameSize).toBeGreaterThanOrEqual(40);
+    expect(layout.nameLines.length).toBeGreaterThan(1);
+    // 折行后每一行都必须仍在内容宽度内
+    for (const line of layout.nameLines) {
+      expect(fakeMeasureText(line, layout.nameSize)).toBeLessThanOrEqual(920);
+    }
+  });
+
+  it('AC-048: grows the canvas instead of clipping a wrapped name', () => {
+    const short = computeRevealCardLayout(revealContent, fakeMeasureText);
+    const long = computeRevealCardLayout(
+      { ...revealContent, name: 'x'.repeat(120) },
+      fakeMeasureText,
+    );
+    expect(long.height).toBeGreaterThan(short.height);
+  });
+
+  it('survives a single-character name', () => {
+    const layout = computeRevealCardLayout({ ...revealContent, name: 'X' }, fakeMeasureText);
+    expect(layout.nameLines).toEqual(['X']);
+    expect(layout.height).toBeGreaterThanOrEqual(720);
+  });
+});
+
+describe('drawRevealCard', () => {
+  /**
+   * 记录型假 ctx，且 measureText **随字号变化**（与 fakeMeasureText 同一约定）。
+   * drawResultCard 那个版本的 measureText 是固定 7px/字符，会让 fitTextSize
+   * 以为任何字号都放得下——揭晓卡必须验证折行，所以这里单独做一个。
+   */
+  function createRevealContext(): { ctx: CanvasRenderingContext2D; texts: string[] } {
+    const texts: string[] = [];
+    const ctx = {
+      fillStyle: '',
+      font: '400 16px sans-serif',
+      textAlign: 'left',
+      textBaseline: 'alphabetic',
+      save(): void {},
+      restore(): void {},
+      fillRect(): void {},
+      fillText(text: string): void {
+        texts.push(text);
+      },
+      measureText(this: { font: string }, text: string): { width: number } {
+        const px = Number(/(\d+(?:\.\d+)?)px/.exec(this.font)?.[1] ?? 16);
+        return { width: text.length * px * 0.6 };
+      },
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, texts };
+  }
+
+  it('AC-048: prints the winner, the field size, the date and the site mark', () => {
+    const { ctx, texts } = createRevealContext();
+    drawRevealCard(ctx, revealContent);
+    expect(texts).toContain('Picked');
+    expect(texts).toContain('Alice');
+    expect(texts).toContain('Out of 23 names');
+    expect(texts).toContain('September 29, 2026');
+    expect(texts).toContain('PlainKit');
+  });
+
+  it('AC-048: prints no domain anywhere on the card', () => {
+    const { ctx, texts } = createRevealContext();
+    drawRevealCard(ctx, revealContent);
+    expect(
+      texts.some((text) => text.includes('http') || text.includes('.app') || text.includes('.io')),
+    ).toBe(false);
+  });
+
+  it('draws every line of a wrapped name', () => {
+    const { ctx, texts } = createRevealContext();
+    drawRevealCard(ctx, { ...revealContent, name: 'x'.repeat(40) });
+    // 40 个 x 在 40px 字号下必然折成多行（第二行只有 2 个字符，所以不能用
+    // startsWith('xxx') 去数，改成「整行都是 x」）
+    const lines = texts.filter((text) => /^x+$/.test(text));
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.join('')).toHaveLength(40);
+  });
+});

@@ -71,6 +71,10 @@ const summary =
               <input type="radio" name="mode" id="mode-teams" value="teams" />
               <span>Teams</span>
             </label>
+            <label class="mode-switch__option">
+              <input type="radio" name="mode" id="mode-wheel" value="wheel" />
+              <span>Wheel</span>
+            </label>
           </div>
         </div>
 
@@ -100,6 +104,27 @@ const summary =
             aria-describedby="param-error"
           />
           <p class="bench__error" id="param-error"></p>
+        </div>
+
+        <!-- 转盘模式：盘面 + 连抽开关（AC-042 / 046）。图形是视觉辅助，
+             中签结果由下方读数用 aria-live 播报，所以图形对读屏器隐藏。 -->
+        <div class="bench__field" id="wheel-field" hidden>
+          <div class="wheel" id="wheel-stage">
+            <svg class="wheel__svg" id="wheel-svg" viewBox="0 0 320 320" aria-hidden="true">
+              <g id="wheel-rotor"></g>
+            </svg>
+            <svg class="wheel__pointer" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 22 L4 4 L20 4 Z" />
+            </svg>
+          </div>
+          <label class="wheel__toggle">
+            <input type="checkbox" id="wheel-remove" />
+            <span>Remove winner after each spin</span>
+          </label>
+          <p class="bench__note" id="wheel-notes" role="status"></p>
+          <button type="button" class="link-btn wheel__reset" id="wheel-reset" hidden>
+            Reset wheel
+          </button>
         </div>
 
         <div class="bench__field">
@@ -167,11 +192,31 @@ const summary =
 <script>
   import {
     computeGroupCardLayout,
+    computeRevealCardLayout,
     computeTeamCardLayout,
     drawGroupCard,
+    drawRevealCard,
     drawTeamCard,
   } from '@/lib/shared/canvas-card';
-  import type { GroupCardContent, TeamCardContent } from '@/lib/shared/canvas-card';
+  import type {
+    GroupCardContent,
+    RevealCardContent,
+    TeamCardContent,
+  } from '@/lib/shared/canvas-card';
+  import {
+    WHEEL_JITTER,
+    WHEEL_LABEL_RADIUS,
+    WHEEL_MAX_NAMES,
+    WHEEL_TURNS,
+    advanceRotation,
+    formatPickText,
+    labelTransform,
+    pickWinnerIndex,
+    removeAt,
+    sectorAngles,
+    sectorLabel,
+    sectorPath,
+  } from '@/lib/tools/random-picker/wheel';
   import {
     assignGroups,
     balanceTeams,
@@ -193,8 +238,11 @@ const summary =
   const MAX_NAMES = 300;
   const STORAGE_KEY = 'plainkit.random-picker.names';
 
-  type Mode = 'groups' | 'pick' | 'order' | 'teams';
+  type Mode = 'groups' | 'pick' | 'order' | 'teams' | 'wheel';
   type GroupBy = 'count' | 'size';
+
+  /** SVG 命名空间——createElement 建不出 SVG 元素，必须用 createElementNS。 */
+  const SVG_NS = 'http://www.w3.org/2000/svg';
 
   /** 最近一次成功生成的结果，供 Regenerate / Copy / Download 使用。 */
   interface PickerResult {
@@ -232,6 +280,13 @@ const summary =
     const modePick = document.querySelector('#mode-pick');
     const modeOrder = document.querySelector('#mode-order');
     const modeTeams = document.querySelector('#mode-teams');
+    const modeWheel = document.querySelector('#mode-wheel');
+    const wheelField = document.querySelector('#wheel-field');
+    const wheelSvg = document.querySelector('#wheel-svg');
+    const wheelRotor = document.querySelector('#wheel-rotor');
+    const wheelRemove = document.querySelector('#wheel-remove');
+    const wheelNotes = document.querySelector('#wheel-notes');
+    const wheelReset = document.querySelector('#wheel-reset');
     const teamNotes = document.querySelector('#team-notes');
     const readoutValue = document.querySelector('#readout-value');
     const groupByField = document.querySelector('#group-by-field');
@@ -259,6 +314,13 @@ const summary =
       !(modePick instanceof HTMLInputElement) ||
       !(modeOrder instanceof HTMLInputElement) ||
       !(modeTeams instanceof HTMLInputElement) ||
+      !(modeWheel instanceof HTMLInputElement) ||
+      !(wheelField instanceof HTMLElement) ||
+      !(wheelSvg instanceof SVGElement) ||
+      !(wheelRotor instanceof SVGElement) ||
+      !(wheelRemove instanceof HTMLInputElement) ||
+      !(wheelNotes instanceof HTMLElement) ||
+      !(wheelReset instanceof HTMLButtonElement) ||
       !(teamNotes instanceof HTMLElement) ||
       !(readoutValue instanceof HTMLElement) ||
       !(groupByField instanceof HTMLElement) ||
@@ -279,11 +341,27 @@ const summary =
     }
 
     const clearButton2 = clearButton instanceof HTMLButtonElement ? clearButton : null;
-    const modeRadios = [modeGroups, modePick, modeOrder, modeTeams];
+    const modeRadios = [modeGroups, modePick, modeOrder, modeTeams, modeWheel];
     let lastResult: PickerResult | null = null;
     let copyResetTimer = 0;
     /** 用户是否动过名单框——初始空状态不显示红色引导（与 grade-calculator 同约定）。 */
     let namesTouched = false;
+
+    // ── 转盘状态（BR-018：这些都不写 localStorage，切模式或改名单即重置）──
+    /** 当前盘面上的名字（连抽会越来越少）。 */
+    let wheelNames: string[] = [];
+    /** 完整名单的人数，用于判断「有人被抽走了」与显示 Reset。 */
+    let wheelFullCount = 0;
+    /** 累计旋转角度（只增不减，保证每次都往前转）。 */
+    let wheelRotation = 0;
+    /** 本次旋转的参与人数（用作结果抬头的「Picked from N names」）。 */
+    let wheelFieldSize = 0;
+    /** 高亮的扇区索引；移除中签者后索引失效，置回 null。 */
+    let wheelWinnerIndex: number | null = null;
+    /** 旋转进行中——用于禁用 Spin，防止连点（AC-054）。 */
+    let wheelSpinning = false;
+    /** 是否转过至少一次（决定按钮文案是 Spin 还是 Spin again）。 */
+    let wheelSpun = false;
 
     const view = {
       namesInput,
@@ -307,6 +385,12 @@ const summary =
       regenerateButton,
       copyButton,
       downloadButton,
+      wheelField,
+      wheelSvg,
+      wheelRotor,
+      wheelRemove,
+      wheelNotes,
+      wheelReset,
     };
 
     const currentMode = (): Mode => {
@@ -327,8 +411,14 @@ const summary =
     function syncParamField(): void {
       const mode = currentMode();
       const groupBy = view.groupBySelect.value as GroupBy;
+      const wheel = mode === 'wheel';
       view.groupByField.hidden = mode !== 'groups';
-      view.paramField.hidden = mode === 'order';
+      view.paramField.hidden = wheel || mode === 'order';
+      view.wheelField.hidden = !wheel;
+      // 转盘模式下「Regenerate」与 Spin again 是同一件事，不重复给两个按钮
+      view.regenerateButton.hidden = wheel;
+      view.generateButton.textContent = wheel ? 'Spin' : 'Generate';
+
       if (mode === 'groups') {
         view.paramLabel.textContent = groupBy === 'count' ? 'Number of groups' : 'People per group';
       } else if (mode === 'pick') {
@@ -471,6 +561,14 @@ const summary =
     /** 重新校验输入并更新 Generate 按钮与提示（AC-010）；未输入过的空页面不显示红色错误。 */
     function validate(): void {
       const names = readNames();
+      if (currentMode() === 'wheel') {
+        // 名单一改，盘面、角度、结果全部重置（AC-055）
+        resetWheelFrom(names);
+        if (!wheelReady()) {
+          renderPending('Add at least 2 names, then press Spin.');
+        }
+        return;
+      }
       if (names.length < 2) {
         view.generateButton.disabled = true;
         if (namesTouched && view.namesHint.textContent === '') {
@@ -520,6 +618,10 @@ const summary =
       const mode = currentMode();
       if (mode === 'teams') {
         generateTeams();
+        return;
+      }
+      if (mode === 'wheel') {
+        spin();
         return;
       }
 
@@ -587,6 +689,186 @@ const summary =
       });
     }
 
+    // ── 转盘（Wheel 模式）──────────────────────────────────────────────
+    // 扇区几何与文字截断全部由 wheel.ts 的纯函数算好，这里只把结果搬进 DOM。
+
+    /** 扇区文字要按真实字体宽度截断，用一块离屏 canvas 做测量。 */
+    let measureCanvas: HTMLCanvasElement | null = null;
+    function wheelMeasure(): (text: string, px: number) => number {
+      if (measureCanvas === null) measureCanvas = document.createElement('canvas');
+      const ctx = measureCanvas.getContext('2d');
+      // 拿不到 2d 上下文时退回一个粗略估算——标签略宽总比不显示好
+      if (!ctx) return (text, px) => text.length * px * 0.6;
+      return (text, px) => {
+        ctx.font = `400 ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+        return ctx.measureText(text).width;
+      };
+    }
+
+    /** 重建盘面（AC-042 / 052）。旋转角度挂在 svg 上，不随重建丢失。 */
+    function renderWheel(): void {
+      view.wheelRotor.textContent = '';
+      const count = wheelNames.length;
+      // 转不了的名单不画盘——画一个转不动的轮子只会让人以为它坏了
+      if (!wheelReady()) return;
+      const step = 360 / count;
+      const measure = wheelMeasure();
+
+      for (const sector of sectorAngles(count)) {
+        const win = wheelWinnerIndex === sector.index;
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('d', sectorPath(sector));
+        path.setAttribute(
+          'class',
+          `wheel__sector${sector.index % 2 === 1 ? ' wheel__sector--alt' : ''}${
+            win ? ' wheel__sector--win' : ''
+          }`,
+        );
+        view.wheelRotor.append(path);
+
+        const label = sectorLabel(wheelNames[sector.index] ?? '', step, measure);
+        if (!label.visible) continue;
+        const text = document.createElementNS(SVG_NS, 'text');
+        text.setAttribute('class', win ? 'wheel__label wheel__label--win' : 'wheel__label');
+        text.setAttribute('transform', labelTransform(sector.center, WHEEL_LABEL_RADIUS));
+        text.setAttribute('text-anchor', 'end');
+        text.setAttribute('dominant-baseline', 'central');
+        text.setAttribute('font-size', String(label.fontSize));
+        text.textContent = label.text;
+        view.wheelRotor.append(text);
+      }
+    }
+
+    /** 盘下方的说明行与 Reset 可见性（AC-047 / 050 / 051）。 */
+    function updateWheelNotes(): void {
+      const count = wheelNames.length;
+      const removed = wheelFullCount - count;
+      view.wheelReset.hidden = count >= wheelFullCount;
+
+      if (count === 0 && wheelFullCount > 0) {
+        view.wheelNotes.textContent = 'Everyone has been picked. Reset to start over.';
+        return;
+      }
+      if (count > WHEEL_MAX_NAMES) {
+        view.wheelNotes.textContent = `The wheel holds up to ${WHEEL_MAX_NAMES} names — use Pick names for a longer list.`;
+        return;
+      }
+      // 一份没动过的名单只有 1 个人时没什么可随机，照旧劝退（AC-051）
+      if (removed === 0 && count < 2) {
+        view.wheelNotes.textContent = 'Add at least 2 names to spin.';
+        return;
+      }
+      view.wheelNotes.textContent =
+        removed > 0 ? `${removed} already picked — ${count} left on the wheel.` : '';
+    }
+
+    /**
+     * 转盘能不能转。
+     *
+     * 常规门槛是 2 人（AC-051）；但连抽抽到最后只剩 1 人时允许再转一次，
+     * 否则最后一个人既转不出来、也走不到「全都抽完了」这个收尾状态（AC-047）。
+     */
+    function wheelReady(): boolean {
+      const count = wheelNames.length;
+      if (count > WHEEL_MAX_NAMES) return false;
+      return count >= 2 || (count === 1 && count < wheelFullCount);
+    }
+
+    function updateSpinButton(): void {
+      view.generateButton.disabled = !wheelReady() || wheelSpinning;
+      view.generateButton.textContent = wheelSpun ? 'Spin again' : 'Spin';
+    }
+
+    /** 应用旋转角度。`animate = false` 用于复位——复位本身不能带动画。 */
+    function applyRotation(degrees: number, animate: boolean): void {
+      if (!animate) view.wheelSvg.style.transition = 'none';
+      view.wheelSvg.style.transform = `rotate(${degrees}deg)`;
+      if (!animate) {
+        void view.wheelSvg.getBoundingClientRect(); // 强制重排，让复位立即生效
+        view.wheelSvg.style.transition = '';
+      }
+    }
+
+    /** 旋转时长直接读 CSS：reduced-motion 下会被全局规则压到 0.01ms（AC-056）。 */
+    function spinDurationMs(): number {
+      const seconds = Number.parseFloat(window.getComputedStyle(view.wheelSvg).transitionDuration);
+      return Number.isFinite(seconds) ? seconds * 1000 : 0;
+    }
+
+    /** 用一份名单重建转盘状态（AC-055：改名单 / 切模式 / 去重都会走这里）。 */
+    function resetWheelFrom(names: string[]): void {
+      wheelNames = names;
+      wheelFullCount = names.length;
+      wheelWinnerIndex = null;
+      wheelSpinning = false;
+      wheelSpun = false;
+      wheelRotation = 0;
+      applyRotation(0, false);
+      renderWheel();
+      updateWheelNotes();
+      updateSpinButton();
+    }
+
+    function resetWheel(): void {
+      resetWheelFrom(readNames());
+    }
+
+    /** 把中签者写进读数并启用导出（AC-043 / 048 / 049）。 */
+    function revealWinner(winner: string | null): void {
+      if (winner === null) {
+        renderPending('Add at least 2 names, then press Spin.');
+        return;
+      }
+      renderResult({
+        mode: 'wheel',
+        groupBy: 'count',
+        param: 0,
+        groups: [],
+        members: [winner],
+        teams: null,
+        rated: false,
+        summary: winner,
+        modeLabel: `Picked from ${wheelFieldSize} names`,
+      });
+    }
+
+    /**
+     * 转一次。**先算中签者，再反推角度**（BR-015）：
+     * 反过来做会在浮点误差下产生偏差，而「先转后定」是假随机。
+     */
+    function spin(): void {
+      const count = wheelNames.length;
+      if (wheelSpinning || !wheelReady()) return;
+
+      const index = pickWinnerIndex(count, cryptoRandom);
+      const step = 360 / count;
+      const jitter = (cryptoRandom() * 2 - 1) * WHEEL_JITTER * (step / 2);
+      wheelRotation = advanceRotation(wheelRotation, index, count, WHEEL_TURNS, jitter);
+      wheelFieldSize = count;
+
+      wheelSpinning = true;
+      wheelSpun = true;
+      wheelWinnerIndex = null;
+      renderWheel(); // 清掉上一次的高亮
+      updateSpinButton(); // AC-054：旋转中禁用 Spin
+      applyRotation(wheelRotation, true);
+
+      window.setTimeout(() => {
+        wheelSpinning = false;
+        const winner = wheelNames[index] ?? null;
+        if (view.wheelRemove.checked) {
+          wheelNames = removeAt(wheelNames, index);
+          wheelWinnerIndex = null; // 移除后索引失效，高亮取消
+        } else {
+          wheelWinnerIndex = index;
+        }
+        renderWheel();
+        updateWheelNotes();
+        updateSpinButton();
+        revealWinner(winner);
+      }, spinDurationMs() + 60);
+    }
+
     // ── 输入与名单持久化（AC-008 / 016）─────────────────────────────────
     let clearArmed = false;
     let clearResetTimer = 0;
@@ -631,9 +913,16 @@ const summary =
     for (const radio of modeRadios) {
       radio.addEventListener('change', () => {
         syncParamField();
+        // 换模式等于换一种结果，旧结果（尤其是转盘抽出的名字）不该留在读数里
+        renderPending('Enter at least 2 names, then press Generate.');
         validate();
       });
     }
+
+    view.wheelReset.addEventListener('click', () => {
+      resetWheel();
+      renderPending('Spin the wheel to pick a name.');
+    });
     view.groupBySelect.addEventListener('change', () => {
       syncParamField();
       validate();
@@ -649,6 +938,9 @@ const summary =
     // ── 复制文本（AC-006）───────────────────────────────────────────────
     function resultText(result: PickerResult): string {
       const header = `${result.modeLabel} · ${todayLabel()} · PlainKit`;
+      if (result.mode === 'wheel') {
+        return formatPickText(result.members[0] ?? '', header);
+      }
       if (result.teams) {
         return formatTeamsText(result.teams, header, result.rated);
       }
@@ -704,7 +996,17 @@ const summary =
       };
 
       let filename = 'random-groups.png';
-      if (result.teams) {
+      if (result.mode === 'wheel') {
+        const reveal: RevealCardContent = {
+          title: 'Picked',
+          name: result.members[0] ?? '',
+          note: result.modeLabel,
+          dateLabel: todayLabel(),
+        };
+        canvas.height = computeRevealCardLayout(reveal, measure).height;
+        drawRevealCard(ctx, reveal);
+        filename = 'wheel-pick.png';
+      } else if (result.teams) {
         const teamContent: TeamCardContent = {
           title: '',
           modeLabel: result.modeLabel,
@@ -872,5 +1174,93 @@ const summary =
     padding: 0;
     font-size: var(--text-base);
     line-height: 1.7;
+  }
+
+  /* ── 转盘（Wheel 模式）───────────────────────────────────────────────
+     扇区只用 surface / surface-alt 两色交替，中签扇区用 accent-wash。
+     不新增颜色令牌——彩色轮盘是竞品的视觉语言，也是老虎机的视觉语言。 */
+  .wheel {
+    position: relative;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+  }
+
+  .wheel__svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    /* 全站唯一的超长动效：一次性、非循环（BR-017 / DESIGN.md §6-bis.7） */
+    transition: transform var(--dur-reveal) var(--ease-out);
+  }
+
+  .wheel__pointer {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    width: 22px;
+    height: 22px;
+    transform: translateX(-50%);
+    fill: var(--ink);
+    pointer-events: none;
+  }
+
+  .wheel__toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    font-size: var(--text-base);
+    cursor: pointer;
+  }
+
+  .wheel__toggle input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+  }
+
+  .wheel__reset {
+    display: block;
+    margin-top: var(--space-2);
+  }
+
+  /* 同上：display: block 会盖掉 hidden 的 display: none */
+  .wheel__reset[hidden] {
+    display: none;
+  }
+
+  /* 中签名字可能很长：允许折行，绝不截断（结果必须完整可见） */
+  .readout__value {
+    overflow-wrap: anywhere;
+  }
+</style>
+
+<!-- 扇区与扇区文字是 JS 动态创建的，拿不到 Astro 的 scoped 属性，
+     用 scoped 选择器会静默不生效（扇区会落回 SVG 默认的黑色填充）。
+     颜色照抄设计令牌，不自创。 -->
+<style is:global>
+  .wheel__sector {
+    fill: var(--surface);
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+
+  .wheel__sector--alt {
+    fill: var(--surface-alt);
+  }
+
+  /* 放在最后：中签高亮要盖过交替底色 */
+  .wheel__sector--win {
+    fill: var(--accent-wash);
+  }
+
+  .wheel__label {
+    fill: var(--ink);
+    font-family: var(--font-sans);
+  }
+
+  .wheel__label--win {
+    fill: var(--accent);
   }
 </style>

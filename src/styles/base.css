@@ -303,6 +303,12 @@ code {
   min-width: 0;
 }
 
+/* display: grid 会盖掉 hidden 属性自带的 display: none —— 用 .hidden 切换
+   字段可见性时，不显式压回就永远藏不住。 */
+.bench__field[hidden] {
+  display: none;
+}
+
 .bench__label {
   font-size: var(--text-label);
   font-weight: 500;
