@@ -92,6 +92,10 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
           </p>
           <p class="bench__error" id="card-note-error"></p>
         </div>
+
+        <p class="bench__hint" id="draft-note" hidden>
+          Restored your last draft — it stays in this browser only.
+        </p>
       </div>
 
       <output class="readout" id="readout" data-state="pending" aria-live="polite">
@@ -119,6 +123,17 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
         </button>
       </div>
 
+      <!-- 剪贴板彻底不可用时的退路：CR-001 之后地址栏不再实时携带卡片，
+           「去复制地址栏」这句话已经不成立了，必须给出真实可选的链接（AC-032）。 -->
+      <input
+        class="link-fallback"
+        id="copy-fallback"
+        type="text"
+        readonly
+        hidden
+        aria-label="Link to your card — select and copy it manually"
+      />
+
       <div class="tool__actions" id="view-actions">
         <a class="btn" data-variant="primary" href={href('tools/countdown-card/')}>
           Make your own
@@ -136,15 +151,17 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
 
       <h2 class="tool__notes-title">Sharing</h2>
       <p class="tool__notes-body">
-        Copy link gives you a link that opens the card directly — the whole card lives in the link
-        itself, so it keeps counting down on its own. Download image saves a square PNG with a small
+        Copy link builds a link that opens the card directly — the whole card lives in the link
+        itself, so it keeps counting down on its own. The link is made when you press the button,
+        and your own draft is never folded into it. Download image saves a square PNG with a small
         PlainKit mark in the corner.
       </p>
 
       <h2 class="tool__notes-title">Private by default</h2>
       <p class="tool__notes-body">
-        Everything is calculated on your device. Nothing you type is sent anywhere — there is no
-        server to send it to.
+        Everything is calculated on your device. What you type is kept in this browser's own storage
+        as a draft, so a refresh will not lose it — clear every field and the draft is deleted. None
+        of it is sent anywhere; there is no server to send it to.
       </p>
     </section>
   </article>
@@ -155,6 +172,7 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
   import type { CardContent } from '@/lib/shared/canvas-card';
   import {
     computeCountdown,
+    DRAFT_STORAGE_KEY,
     decodeState,
     encodeState,
     formatTargetDate,
@@ -162,13 +180,52 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
     parseNote,
     parseTheme,
     parseTitle,
+    readDraft,
+    writeDraft,
   } from '@/lib/tools/countdown-card';
-  import type { CountdownCardState } from '@/lib/tools/countdown-card';
+  import type { CardDraft, CountdownCardState } from '@/lib/tools/countdown-card';
 
   /** 用户是否已经动过任何字段——初始空状态不显示错误（与 grade-calculator 同约定）。 */
   let touched = false;
   /** 最近一次全部有效的输入，供 Copy link / Download 使用；无效时为 null。 */
   let lastState: CountdownCardState | null = null;
+  /** 本次加载的初始值是否来自本机草稿——恢复提示的显示条件（AC-030）。 */
+  let draftRestored = false;
+  /** 是否处在观览模式（分享链接打开）：此模式一律不碰本机草稿（AC-025）。 */
+  let sharedMode = false;
+
+  /**
+   * 读取本机草稿。
+   *
+   * 这是全站唯一允许直接碰 localStorage 的地方之一，且必须包 try/catch：
+   * 隐私模式下 `localStorage` 的读写会抛异常，届时草稿功能静默失效，
+   * 页面其余功能照常可用（AC-028）。草稿值本身由纯函数 readDraft 校验（AC-027）。
+   */
+  function loadDraft(): CardDraft | null {
+    try {
+      return readDraft(window.localStorage.getItem(DRAFT_STORAGE_KEY));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 把四个字段的原始值写入本机草稿。
+   *
+   * writeDraft 返回 null = 「没有值得保存的内容」（三项文本全空），此时删键——
+   * 页面上等价于「清空表单 = 丢掉草稿」（AC-024）。
+   */
+  function saveDraft(draft: CardDraft): void {
+    // 观览模式下的 render() 只负责画卡；这张卡是别人给你的，写进草稿会顶掉你自己的（AC-025）。
+    if (sharedMode) return;
+    try {
+      const text = writeDraft(draft);
+      if (text === null) window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      else window.localStorage.setItem(DRAFT_STORAGE_KEY, text);
+    } catch {
+      // 存储不可用（隐私模式 / 被禁用）：草稿失效，但不影响任何其它功能
+    }
+  }
 
   /**
    * 页面初始化。
@@ -187,6 +244,7 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
     const themeWarm = document.querySelector('#theme-warm');
     const noteInput = document.querySelector('#card-note');
     const noteCount = document.querySelector('#note-count');
+    const draftNote = document.querySelector('#draft-note');
     const readout = document.querySelector('#readout');
     const card = document.querySelector('#card');
     const cardTitle = document.querySelector('#card-title-label');
@@ -196,6 +254,7 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
     const readoutNote = document.querySelector('#readout-note');
     const copyButton = document.querySelector('#copy-link');
     const downloadButton = document.querySelector('#download-image');
+    const copyFallback = document.querySelector('#copy-fallback');
 
     if (
       !(tool instanceof HTMLElement) ||
@@ -207,6 +266,7 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       !(themeWarm instanceof HTMLInputElement) ||
       !(noteInput instanceof HTMLInputElement) ||
       !(noteCount instanceof HTMLElement) ||
+      !(draftNote instanceof HTMLElement) ||
       !(readout instanceof HTMLElement) ||
       !(card instanceof HTMLElement) ||
       !(cardTitle instanceof HTMLElement) ||
@@ -215,7 +275,8 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       !(cardNote instanceof HTMLElement) ||
       !(readoutNote instanceof HTMLElement) ||
       !(copyButton instanceof HTMLButtonElement) ||
-      !(downloadButton instanceof HTMLButtonElement)
+      !(downloadButton instanceof HTMLButtonElement) ||
+      !(copyFallback instanceof HTMLInputElement)
     ) {
       throw new Error('countdown-card: required elements not found');
     }
@@ -228,6 +289,7 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       tool,
       lead,
       noteCount,
+      draftNote,
       readout,
       card,
       cardTitle,
@@ -237,6 +299,7 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       readoutNote,
       copyButton,
       downloadButton,
+      copyFallback,
     };
 
     function setError(input: HTMLInputElement, errorId: string, message: string): void {
@@ -259,7 +322,7 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       view.downloadButton.disabled = true;
     }
 
-    /** 重新校验并渲染卡片。输入变化即调用；URL 同步也在这里完成。 */
+    /** 重新校验并渲染卡片。任何输入变化都调用它。 */
     function render(): void {
       lastState = null;
 
@@ -269,6 +332,16 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       const theme = parseTheme(checkedTheme ? checkedTheme.value : '');
       const note = parseNote(inputs.note.value);
 
+      // 每次重算都顺手把四个字段的**原始**值写进本机草稿：存的是用户正在输入
+      // 的东西，校验还没通过的半成品也要留下（AC-019 / AC-020）。
+      saveDraft({
+        title: inputs.title.value,
+        date: inputs.date.value,
+        theme: theme.ok ? theme.value : 'light',
+        note: inputs.note.value,
+      });
+      updateDraftNote();
+
       setError(inputs.title, 'card-title-error', touched && !title.ok ? title.message : '');
       setError(inputs.date, 'card-date-error', touched && !date.ok ? date.message : '');
       setError(inputs.note, 'card-note-error', touched && !note.ok ? note.message : '');
@@ -276,7 +349,6 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
 
       if (!title.ok || !date.ok || !theme.ok || !note.ok) {
         renderPending();
-        syncUrl(null);
         return;
       }
 
@@ -288,7 +360,6 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
         note: note.value,
       };
       lastState = state;
-      syncUrl(state);
 
       const countdown = computeCountdown(state.date, new Date());
       view.card.dataset.theme = state.theme;
@@ -313,11 +384,9 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       view.downloadButton.disabled = false;
     }
 
-    /** 把当前状态同步进地址栏（Copy link 的基础）；无效时清掉参数。 */
-    function syncUrl(state: CountdownCardState | null): void {
-      const url = new URL(window.location.href);
-      url.search = state ? encodeState(state).toString() : '';
-      window.history.replaceState(null, '', url);
+    /** 恢复提示：只在「这次打开是靠草稿回填的」且用户还没动过字段时出现（AC-030）。 */
+    function updateDraftNote(): void {
+      view.draftNote.hidden = !(draftRestored && !touched);
     }
 
     for (const input of [inputs.title, inputs.date, inputs.note]) {
@@ -342,26 +411,61 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       }, 2000);
     }
 
+    /**
+     * 把文本送上剪贴板：现代 API 优先，失败再试一次 execCommand。
+     *
+     * 存在这两级是因为自托管场景可能是 http（非安全上下文），此时根本不存在
+     * `navigator.clipboard`；而 execCommand 兜底在点击的余韵里仍然有效。
+     * 返回是否成功，供调用方决定要不要把链接摊出来给用户手选。
+     */
+    function writeToClipboard(text: string): Promise<boolean> {
+      const write = navigator.clipboard?.writeText(text);
+      if (write)
+        return write.then(
+          () => true,
+          () => legacyCopy(text),
+        );
+      return Promise.resolve(legacyCopy(text));
+    }
+
+    /** execCommand 兜底：临时 textarea → 选中 → copy → 立刻拆掉。 */
+    function legacyCopy(text: string): boolean {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.top = '-1000px';
+      document.body.appendChild(area);
+      area.select();
+      let copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch {
+        copied = false;
+      }
+      area.remove();
+      return copied;
+    }
+
     view.copyButton.addEventListener('click', () => {
       if (!lastState) return;
       const url = new URL(window.location.href);
       url.search = encodeState(lastState).toString();
 
-      const write = navigator.clipboard?.writeText(url.href);
-      if (!write) {
-        view.copyButton.textContent = 'Copying is not available in this browser';
-        resetCopyLabelLater();
-        return;
-      }
-
-      write
-        .then(() => {
+      writeToClipboard(url.href).then((copied) => {
+        if (copied) {
           view.copyButton.textContent = 'Link copied';
-        })
-        .catch(() => {
-          view.copyButton.textContent = 'Copying was blocked — copy the address bar link instead';
-        })
-        .finally(resetCopyLabelLater);
+          view.copyFallback.hidden = true;
+          resetCopyLabelLater();
+          return;
+        }
+        // 剪贴板走不通（非安全上下文 / 权限被拒）：把真实链接摊给用户手选，
+        // 不说「去复制地址栏」那种已经不成立的话（AC-032）。
+        view.copyFallback.value = url.href;
+        view.copyFallback.hidden = false;
+        view.copyFallback.select();
+        view.copyButton.textContent = 'Select the link and copy it';
+      });
     });
 
     // ── Download image（AC-005 / AC-018）：1080×1080 PNG ───────────────
@@ -398,9 +502,11 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       }, 'image/png');
     });
 
-    // ── 分享链接：合法参数 → 观览模式（AC-007 / AC-015）─────────────────
+    // ── 进入页面时的三条路：分享链接 / 本机草稿 / 干净的空表单 ───────────
     const decoded = decodeState(new URLSearchParams(window.location.search));
     if (decoded) {
+      // 分享链接 → 观览模式（AC-006 / AC-007）。不读、不写本机草稿（AC-025）。
+      sharedMode = true;
       inputs.title.value = decoded.title;
       inputs.date.value = decoded.date;
       const radio = themeRadios.find((element) => element.value === decoded.theme);
@@ -409,6 +515,24 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
       touched = true;
       view.tool.dataset.mode = 'view';
       view.lead.textContent = 'A shared countdown card, counting down in real time.';
+    } else {
+      // 编辑态。地址栏里带着解析不出来的参数（被篡改 / 旧版链接）时就地清掉，
+      // 免得用户把一条坏地址当成自己的卡复制出去（AC-029）。
+      if (window.location.search !== '') {
+        const url = new URL(window.location.href);
+        url.search = '';
+        window.history.replaceState(null, '', url);
+      }
+      // 本机草稿回填：部分输入也要回来，且不算「用户动过」，不得标红（AC-020 / AC-021）
+      const draft = loadDraft();
+      if (draft) {
+        inputs.title.value = draft.title;
+        inputs.date.value = draft.date;
+        const radio = themeRadios.find((element) => element.value === draft.theme);
+        if (radio) radio.checked = true;
+        inputs.note.value = draft.note;
+        draftRestored = true;
+      }
     }
 
     render();
@@ -470,6 +594,24 @@ const summary = 'Count the days to (or since) a date that matters, as a card wor
     color: var(--ink-faint);
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* 剪贴板兜底：可手选的只读链接（AC-032），正常路径下不可见 */
+  .link-fallback {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    font-size: var(--text-sm);
+  }
+
+  /* 草稿恢复提示（AC-030）：补充说明而非必要信息，故用 --ink-muted 而非 --ink-faint */
+  .bench__hint {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
   }
 
   /* 卡片预览：分享产物的 1:1 呈现，颜色随主题切换 */

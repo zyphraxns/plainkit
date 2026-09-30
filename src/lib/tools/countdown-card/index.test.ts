@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computeCountdown,
+  DRAFT_STORAGE_KEY,
   decodeState,
   encodeState,
   formatTargetDate,
@@ -9,7 +10,10 @@ import {
   parseNote,
   parseTheme,
   parseTitle,
+  readDraft,
+  writeDraft,
 } from './index';
+import type { CardDraft } from './index';
 
 describe('parseDate', () => {
   it('AC-010: rejects an empty input with a specific message', () => {
@@ -197,5 +201,88 @@ describe('encodeState / decodeState', () => {
   it('AC-015: returns null when the note param exceeds the limit', () => {
     const params = new URLSearchParams(`date=2027-06-15&theme=light&note=${'x'.repeat(81)}`);
     expect(decodeState(params)).toBeNull();
+  });
+});
+
+describe('writeDraft / readDraft', () => {
+  const full: CardDraft = {
+    title: 'Graduation',
+    date: '2027-06-15',
+    theme: 'midnight',
+    note: 'Ceremony starts at 10:00.',
+  };
+
+  it('AC-019: serialises a draft and reads it back unchanged', () => {
+    const text = writeDraft(full);
+    expect(text).not.toBeNull();
+    if (text === null) return;
+    expect(readDraft(text)).toEqual(full);
+  });
+
+  it('AC-020: keeps a partial draft — a title with no date yet', () => {
+    const partial = { title: 'Graduation', date: '', theme: 'light', note: '' } as const;
+    const text = writeDraft(partial);
+    expect(text).not.toBeNull();
+    if (text === null) return;
+    expect(readDraft(text)).toEqual(partial);
+  });
+
+  it('AC-020: an empty date is legal in a draft (unlike in a link)', () => {
+    expect(readDraft('{"title":"","date":"","theme":"warm","note":""}')).toEqual({
+      title: '',
+      date: '',
+      theme: 'warm',
+      note: '',
+    });
+  });
+
+  it('AC-024: returns null when every text field is empty (the key gets deleted)', () => {
+    expect(writeDraft({ title: '', date: '', theme: 'light', note: '' })).toBeNull();
+  });
+
+  it('AC-027: unreadable storage values are treated as no draft at all', () => {
+    for (const raw of [null, '', 'not json', '{"title":', '[1,2,3]', '"a string"', 'null', '7']) {
+      expect(readDraft(raw)).toBeNull();
+    }
+  });
+
+  it('AC-027: a JSON object missing fields is rejected rather than patched up', () => {
+    expect(readDraft('{}')).toBeNull();
+    expect(readDraft('{"title":"Graduation"}')).toBeNull();
+    expect(readDraft('{"title":"x","date":"2027-06-15","theme":"light"}')).toBeNull();
+  });
+
+  it('AC-027: non-string fields are rejected', () => {
+    expect(readDraft('{"title":7,"date":"","theme":"light","note":""}')).toBeNull();
+    expect(readDraft('{"title":"","date":20270615,"theme":"light","note":""}')).toBeNull();
+    expect(readDraft('{"title":"","date":"","theme":true,"note":""}')).toBeNull();
+  });
+
+  it('AC-027: a tampered theme invalidates the whole draft', () => {
+    expect(readDraft('{"title":"","date":"2027-06-15","theme":"neon","note":""}')).toBeNull();
+  });
+
+  it('AC-027: over-length fields invalidate the draft', () => {
+    expect(
+      readDraft(`{"title":"${'x'.repeat(61)}","date":"","theme":"light","note":""}`),
+    ).toBeNull();
+    expect(
+      readDraft(`{"title":"","date":"","theme":"light","note":"${'x'.repeat(81)}"}`),
+    ).toBeNull();
+  });
+
+  it('AC-027: an impossible date invalidates the draft', () => {
+    expect(readDraft('{"title":"","date":"2027-02-30","theme":"light","note":""}')).toBeNull();
+    expect(readDraft('{"title":"","date":"2027-6-1","theme":"light","note":""}')).toBeNull();
+  });
+
+  it('AC-019: writeDraft refuses to write anything readDraft would reject', () => {
+    expect(writeDraft({ title: 'x'.repeat(61), date: '', theme: 'light', note: '' })).toBeNull();
+    expect(writeDraft({ title: '', date: '2027-02-30', theme: 'light', note: '' })).toBeNull();
+    expect(writeDraft({ ...full, theme: 'neon' as 'light' })).toBeNull();
+  });
+
+  it('AC-019: the storage key is pinned so future renames cannot orphan saved drafts', () => {
+    expect(DRAFT_STORAGE_KEY).toBe('plainkit:countdown-card:draft');
   });
 });

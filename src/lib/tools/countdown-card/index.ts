@@ -188,3 +188,79 @@ export function decodeState(params: URLSearchParams): CountdownCardState | null 
 
   return { title: title.value, date: date.value, theme: theme.value, note: note.value };
 }
+
+/** 本地草稿的存储键（BR-005）：页面脚本层单点读写，改名会丢掉用户已存的草稿。 */
+export const DRAFT_STORAGE_KEY = 'plainkit:countdown-card:draft';
+
+/**
+ * 本地草稿的四个**原始**字段值（BR-005）。
+ *
+ * 与 URL 里的 `CountdownCardState` 关键区别：`date` 允许空串——草稿要能保存
+ * 「填了一半」的进度，而分享链接缺了 date 就没有卡片可言。
+ */
+export interface CardDraft {
+  title: string;
+  /** 空串 = 还没选日期；非空时必须是合法 ISO（浏览器 date 输入只会给这两种） */
+  date: string;
+  theme: CardTheme;
+  note: string;
+}
+
+/**
+ * 把草稿序列化成待写入 localStorage 的字符串。
+ *
+ * 校验与 `readDraft` 完全对称：写不出将来读不回来的内容。
+ * 三项文本（title / date / note）全空时返回 null——调用方据此删键，
+ * 页面上等价于「清空表单即丢掉草稿」（AC-024）。
+ */
+export function writeDraft(draft: CardDraft): string | null {
+  if (draft.title === '' && draft.date === '' && draft.note === '') return null;
+  if (draft.title.length > MAX_TITLE_LENGTH) return null;
+  if (draft.note.length > MAX_NOTE_LENGTH) return null;
+  if (!THEMES.some((theme) => theme === draft.theme)) return null;
+  if (draft.date !== '' && !parseDate(draft.date).ok) return null;
+  return JSON.stringify({
+    title: draft.title,
+    date: draft.date,
+    theme: draft.theme,
+    note: draft.note,
+  });
+}
+
+/**
+ * 反序列化本地草稿。
+ *
+ * localStorage 里的值一律视为不可信（用户手改、扩展注入、旧版本残留），所以
+ * 每一步都用 abort 而不是兜底修正：任何一处不对都返回 null，页面当作「没有
+ * 草稿」处理，绝不回填半截数据（AC-027）。
+ */
+export function readDraft(raw: string | null): CardDraft | null {
+  if (raw === null || raw === '') return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+
+  const record: Record<string, unknown> = { ...parsed };
+  const title = record['title'];
+  const date = record['date'];
+  const theme = record['theme'];
+  const note = record['note'];
+  if (typeof title !== 'string') return null;
+  if (typeof date !== 'string') return null;
+  if (typeof theme !== 'string') return null;
+  if (typeof note !== 'string') return null;
+
+  if (title.length > MAX_TITLE_LENGTH) return null;
+  if (note.length > MAX_NOTE_LENGTH) return null;
+  if (date !== '' && !parseDate(date).ok) return null;
+
+  const parsedTheme = parseTheme(theme);
+  if (!parsedTheme.ok) return null;
+
+  return { title, date, theme: parsedTheme.value, note };
+}
