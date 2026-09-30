@@ -448,6 +448,27 @@ code {
 
 /* ── 首屏索引（首页使用；首页是唯一允许用卡片网格的地方） ──────────────── */
 
+/* 首页是索引，因此全站唯一的内容列宽 --measure 对它不适用：680px 在 1920 宽屏上
+   只占 35%，两侧各留 620px 空白，列表被挤在中间一小条里。这里放宽到 --measure-index，
+   并把底部留白从 96px 收到 48px——列表结束后的大片空白在宽屏上会被读成「页面没做完」。
+   工具页不受影响：只有首页传 wide，见 DESIGN.md §6-bis.10 与 §5.6。
+
+   三者必须一起放宽：header 的内层、main、footer 的内层共用同一条列宽规则。
+   只改 main 会让左上角标志和页脚缩进到旧列宽的左边缘上，与标题对不齐。 */
+.page--wide,
+.site-header__inner--wide,
+.site-footer__inner--wide {
+  max-width: var(--measure-index);
+}
+
+.page--wide {
+  padding-block: var(--space-7);
+}
+
+.site-footer--tight {
+  margin-top: var(--space-7);
+}
+
 .index-title {
   font-size: var(--text-3xl);
   font-weight: 600;
@@ -476,12 +497,21 @@ code {
   list-style: none;
 }
 
-/* 双列只在 ≥ 640px 生效：内容列宽 680px 减去间距后每列约 330px，
+/* 双列只在 ≥ 640px 生效：内容列宽 680px 减去间距后每列约 310px，
    再窄就会把 "Date duration calculator" 这类标题挤成三行，比单列更难扫。
-   断点与上面的页面内边距断点同值，不新增断点。见 DESIGN.md §6-bis.10。 */
+   断点与上面的页面内边距断点同值。见 DESIGN.md §6-bis.10。 */
 @media (min-width: 640px) {
   .index-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 三列只在 ≥ 1024px 生效。此时容器已放宽到 --measure-index（1040px），
+   每列约 322px —— 比 680px 双列时的 310px 还宽，所以原「禁三列」的理由
+   （680px 下每列仅 213px、标题折三行）在这里不成立。见 DESIGN.md §6-bis.10。 */
+@media (min-width: 1024px) {
+  .index-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

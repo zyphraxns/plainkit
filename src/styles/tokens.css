@@ -79,6 +79,9 @@
   --tracking-tighter: -0.02em;
 
   --measure: 680px;
+  /* 首页索引专用列宽。全站唯一允许宽于 --measure 的容器，只为三列卡片留出版面；
+     工具页一律用 --measure，不得引用本令牌。见 DESIGN.md §6-bis.10。 */
+  --measure-index: 1040px;
   --measure-text: 68ch;
 
   /* ── 间距（4px 基准，只用这套刻度） ────────────────────────────────── */

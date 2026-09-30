@@ -23,4 +23,12 @@ export default defineConfig({
     inlineStylesheets: 'never',
   },
   devToolbar: { enabled: false },
+  vite: {
+    build: {
+      // 压缩器默认会把 @media (min-width: 640px) 改写成 range 语法 @media (width>=640px)。
+      // 两者语义相同，但 Safari 16.4 以下不认 range 语法，会整条忽略——老 Safari 上
+      // 所有断点失效，排版退到最窄一档。锁住 CSS 目标以保留传统写法。见 specs/DESIGN.md §2.5。
+      cssTarget: 'safari15',
+    },
+  },
 });

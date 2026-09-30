@@ -11,9 +11,11 @@ interface Props {
   description: string;
   /** 当前工具 slug。传入时生成 canonical URL 并标注 <body data-tool> */
   tool?: string;
+  /** 宽容器。仅首页索引使用：放宽到 --measure-index 并收紧底部留白。见 DESIGN.md §6-bis.10 */
+  wide?: boolean;
 }
 
-const { title, description, tool } = Astro.props;
+const { title, description, tool, wide = false } = Astro.props;
 
 const pageTitle = title === 'PlainKit' ? title : `${title} · PlainKit`;
 const canonical = tool ? new URL(Astro.url.pathname, Astro.site) : null;
@@ -69,7 +71,7 @@ const currentPath = normalizePath(Astro.url.pathname);
 
   <body data-tool={tool}>
     <header class="site-header">
-      <div class="site-header__inner">
+      <div class:list={['site-header__inner', { 'site-header__inner--wide': wide }]}>
         <a class="site-header__wordmark" href={href('/')}>
           PlainKit
         </a>
@@ -87,12 +89,12 @@ const currentPath = normalizePath(Astro.url.pathname);
       </div>
     </header>
 
-    <main class="page">
+    <main class:list={['page', { 'page--wide': wide }]}>
       <slot />
     </main>
 
-    <footer class="site-footer">
-      <div class="site-footer__inner">
+    <footer class:list={['site-footer', { 'site-footer--tight': wide }]}>
+      <div class:list={['site-footer__inner', { 'site-footer__inner--wide': wide }]}>
         <p>No ads, no tracking, no accounts. Everything is calculated in your browser.</p>
         <p>
           <a class="site-footer__link" href={href('about/')}>
