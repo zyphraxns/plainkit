@@ -56,7 +56,7 @@ const summary =
           </span>
           <div class="mode-switch" role="radiogroup" aria-labelledby="mode-label">
             <label class="mode-switch__option">
-              <input type="radio" name="mode" id="mode-groups" value="groups" checked />
+              <input type="radio" name="mode" id="mode-groups" value="groups" />
               <span>Groups</span>
             </label>
             <label class="mode-switch__option">
@@ -72,7 +72,7 @@ const summary =
               <span>Teams</span>
             </label>
             <label class="mode-switch__option">
-              <input type="radio" name="mode" id="mode-wheel" value="wheel" />
+              <input type="radio" name="mode" id="mode-wheel" value="wheel" checked />
               <span>Wheel</span>
             </label>
           </div>
@@ -139,7 +139,7 @@ const summary =
         <p class="readout__value" id="readout-value" hidden></p>
         <div class="result" id="result" hidden></div>
         <p class="readout__note" id="readout-note">
-          Enter at least 2 names, then press Generate.
+          Enter at least 2 names, then press Spin.
         </p>
       </output>
 
@@ -544,6 +544,13 @@ const summary =
       return names;
     }
 
+    /** 空状态引导文案随模式变化：转盘是 Spin，其余是 Generate。 */
+    function pendingNote(): string {
+      return currentMode() === 'wheel'
+        ? 'Add at least 2 names, then press Spin.'
+        : 'Enter at least 2 names, then press Generate.';
+    }
+
     function renderPending(note: string): void {
       lastResult = null;
       view.readout.dataset.state = 'pending';
@@ -905,7 +912,7 @@ const summary =
         view.namesInput.value = '';
         window.localStorage.removeItem(STORAGE_KEY);
         validate();
-        renderPending('Enter at least 2 names, then press Generate.');
+        renderPending(pendingNote());
       });
     }
 
@@ -914,7 +921,7 @@ const summary =
       radio.addEventListener('change', () => {
         syncParamField();
         // 换模式等于换一种结果，旧结果（尤其是转盘抽出的名字）不该留在读数里
-        renderPending('Enter at least 2 names, then press Generate.');
+        renderPending(pendingNote());
         validate();
       });
     }
@@ -1053,7 +1060,7 @@ const summary =
     // 页面里没有独立 clear 按钮的兜底：把清除动作挂在名单计数旁由模板提供
     syncParamField();
     validate();
-    renderPending('Enter at least 2 names, then press Generate.');
+    renderPending(pendingNote());
   }
 
   // 顶层保护：任何未预期的错误不得导致整页白屏（DESIGN.md §9.3）
