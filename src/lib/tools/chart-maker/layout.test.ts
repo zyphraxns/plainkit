@@ -4,6 +4,7 @@ import type { DataPoint } from './index';
 import {
   computeAxisScale,
   computeBarLayout,
+  computeGroupedBarLayout,
   computeLineLayout,
   computePieLayout,
   formatChartNumber,
@@ -181,5 +182,74 @@ describe('formatChartNumber', () => {
   it('AC-025: never prints exponential notation', () => {
     expect(formatChartNumber(0.005)).not.toContain('e');
     expect(formatChartNumber(1e21)).not.toContain('e');
+  });
+});
+
+describe('computeGroupedBarLayout (CR-001)', () => {
+  const series1 = points(['Jan', 120], ['Feb', 180], ['Mar', 150]);
+  const series2 = points(['Jan', 90], ['Feb', 160], ['Mar', 210]);
+  const values = [...series1.map((p) => p.value), ...series2.map((p) => p.value)];
+
+  it('AC-038: draws two side-by-side bars per label without overlap', () => {
+    const scale = computeAxisScale(values, { zeroBased: true });
+    const layout = computeGroupedBarLayout(series1, series2, scale, box, measure);
+    expect(layout.bars1).toHaveLength(3);
+    expect(layout.bars2).toHaveLength(3);
+    for (let index = 0; index < 3; index += 1) {
+      const first = layout.bars1[index];
+      const second = layout.bars2[index];
+      const nextFirst = layout.bars1[index + 1];
+      if (!first || !second || (index < 2 && !nextFirst)) throw new Error('missing bars');
+      const gap = second.x - (first.x + first.width);
+      expect(gap).toBeGreaterThanOrEqual(0);
+      if (index < 2 && nextFirst) {
+        expect(nextFirst.x).toBeGreaterThanOrEqual(second.x + second.width);
+      }
+    }
+  });
+
+  it('AC-038: keeps each pair centred in its slot', () => {
+    const scale = computeAxisScale(values, { zeroBased: true });
+    const layout = computeGroupedBarLayout(series1, series2, scale, box, measure);
+    const firstBar = layout.bars1[0];
+    const secondBar = layout.bars2[0];
+    if (!firstBar || !secondBar) throw new Error('missing bars');
+    const slot = box.width / 3;
+    const centre = (firstBar.x + secondBar.x + secondBar.width) / 2;
+    const slotCentre = slot / 2;
+    expect(Math.abs(centre - slotCentre)).toBeLessThan(1);
+  });
+
+  it('AC-038: keeps the zero baseline and the union scale', () => {
+    const scale = computeAxisScale(values, { zeroBased: true });
+    const layout = computeGroupedBarLayout(series1, series2, scale, box, measure);
+    const tallest = layout.bars2[2];
+    if (!tallest) throw new Error('missing bars');
+    expect(scale.min).toBe(0);
+    expect(scale.max).toBeGreaterThanOrEqual(210);
+    expect(tallest.y).toBe(layout.zeroY - ((210 - 0) / (scale.max - scale.min)) * box.height);
+  });
+
+  it('AC-038: still skips dense axis labels by stride', () => {
+    const many1 = points(
+      ...Array.from({ length: 20 }, (_u, i) => [`R${i}`, i] as [string, number]),
+    );
+    const many2 = points(
+      ...Array.from({ length: 20 }, (_u, i) => [`R${i}`, i * 2] as [string, number]),
+    );
+    const manyValues = [...many1.map((p) => p.value), ...many2.map((p) => p.value)];
+    const scale = computeAxisScale(manyValues, { zeroBased: true });
+    const layout = computeGroupedBarLayout(many1, many2, scale, box, measure);
+    const shown = layout.labels.filter((label) => label.show);
+    expect(shown.length).toBeLessThanOrEqual(13);
+  });
+
+  it('AC-039: shares one scale across both lines via the union of values', () => {
+    const scale = computeAxisScale(values, { zeroBased: false });
+    const line1 = computeLineLayout(series1, scale, box);
+    const line2 = computeLineLayout(series2, scale, box);
+    expect(line2.points[2]?.y).toBeLessThan(line1.points[0]?.y ?? 0);
+    expect(line1.points).toHaveLength(3);
+    expect(line2.points).toHaveLength(3);
   });
 });

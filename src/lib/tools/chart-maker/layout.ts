@@ -205,6 +205,66 @@ export function computeBarLayout(
   return { bars, labels, zeroY, ticks: ticksWithY(scale, box) };
 }
 
+export interface GroupedBarLayout {
+  bars1: BarBox[];
+  bars2: BarBox[];
+  labels: BarLabel[];
+  zeroY: number;
+  ticks: { value: number; y: number }[];
+}
+
+/**
+ * 分组柱状图布局（CR-001）：每个标签槽位并排两根柱。
+ *
+ * 两根柱合起来占槽位的 70%（与单系列柱占 60% 视觉密度相近），组内留一条
+ * 小间隙；两系列共用并集刻度，0 基准规则与单系列完全一致（BR-005）。
+ */
+export function computeGroupedBarLayout(
+  points1: DataPoint[],
+  points2: DataPoint[],
+  scale: AxisScale,
+  box: PlotBox,
+  measure: MeasureTextAt,
+  labelPx: number = LABEL_PX,
+): GroupedBarLayout {
+  const count = points1.length;
+  const slot = count > 0 ? box.width / count : box.width;
+  const groupWidth = slot * 0.7;
+  const innerGap = Math.max(slot * 0.04, 2);
+  const barWidth = Math.max((groupWidth - innerGap) / 2, 1);
+  const zeroY = yFor(0, scale, box);
+  const showValue = count <= DENSE_LABEL_LIMIT;
+  const stride = Math.max(Math.ceil(count / DENSE_LABEL_LIMIT), 1);
+
+  const buildBar = (point: DataPoint | undefined, index: number, offset: number): BarBox => {
+    const value = point?.value ?? 0;
+    const edge = yFor(value, scale, box);
+    const top = value >= 0 ? edge : zeroY;
+    const bottom = value >= 0 ? zeroY : edge;
+    return {
+      x: box.left + index * slot + (slot - groupWidth) / 2 + offset,
+      y: top,
+      width: barWidth,
+      height: Math.max(bottom - top, 1),
+      value,
+      showValue,
+    };
+  };
+
+  const bars1 = points1.map((point, index) => buildBar(point, index, 0));
+  const bars2 = points2.map((point, index) => buildBar(point, index, barWidth + innerGap));
+
+  const labels = points1.map((point, index) => ({
+    index,
+    text: fitLabel(point.label, Math.max(slot * 0.9, 24), labelPx, measure),
+    x: box.left + index * slot + slot / 2,
+    y: box.top + box.height + LABEL_OFFSET,
+    show: index % stride === 0,
+  }));
+
+  return { bars1, bars2, labels, zeroY, ticks: ticksWithY(scale, box) };
+}
+
 /** 折线图布局：点坐标（首尾贴边）与刻度。 */
 export function computeLineLayout(points: DataPoint[], scale: AxisScale, box: PlotBox): LineLayout {
   const stepX = points.length > 1 ? box.width / (points.length - 1) : 0;

@@ -138,3 +138,85 @@ describe('drawChart', () => {
     expect(texts).toContain('2,480,000');
   });
 });
+
+describe('drawChart with two series (CR-001)', () => {
+  const points2 = [
+    { label: 'Jan', value: 90 },
+    { label: 'Feb', value: 160 },
+    { label: 'Mar', value: 210 },
+  ];
+
+  /** 记录颜色序列的 ctx，用于断言两个系列真的用了两种颜色。 */
+  function createRecordingContext(): {
+    ctx: CanvasRenderingContext2D;
+    texts: string[];
+    fills: string[];
+    strokes: string[];
+  } {
+    const base = createStubContext();
+    const fills: string[] = [];
+    const strokes: string[] = [];
+    const ctx = base.ctx;
+    const original = ctx as unknown as Record<string, unknown>;
+    // fillStyle / strokeStyle 是普通属性赋值，用 getter/setter 包装记录。
+    let fill = '';
+    let stroke = '';
+    Object.defineProperty(ctx, 'fillStyle', {
+      get: () => fill,
+      set: (value: string) => {
+        fill = value;
+        fills.push(value);
+      },
+    });
+    Object.defineProperty(ctx, 'strokeStyle', {
+      get: () => stroke,
+      set: (value: string) => {
+        stroke = value;
+        strokes.push(value);
+      },
+    });
+    original.__fills = fills;
+    original.__strokes = strokes;
+    return { ctx, texts: base.texts, fills, strokes };
+  }
+
+  it('AC-038: draws a legend with two entries for a two-series bar chart', () => {
+    const { ctx, texts } = createRecordingContext();
+    drawChart(ctx, { title: '', type: 'bar', points, points2 }, { width: 1080, height: 680 });
+    expect(texts).toContain('Series 1');
+    expect(texts).toContain('Series 2');
+  });
+
+  it('AC-038: uses the accent green and the neutral gray for the two bar series', () => {
+    const { ctx, fills } = createRecordingContext();
+    drawChart(ctx, { title: '', type: 'bar', points, points2 }, { width: 1080, height: 680 });
+    expect(fills).toContain('#0F6E56');
+    expect(fills).toContain('#6B7280');
+  });
+
+  it('AC-037: draws no legend and no gray for a single-series chart', () => {
+    const { ctx, texts, fills } = createRecordingContext();
+    drawChart(ctx, { title: '', type: 'bar', points }, { width: 1080, height: 680 });
+    expect(texts).not.toContain('Series 1');
+    expect(fills).not.toContain('#6B7280');
+  });
+
+  it('AC-039: strokes both colors for a two-series line chart', () => {
+    const { ctx, strokes } = createRecordingContext();
+    drawChart(ctx, { title: '', type: 'line', points, points2 }, { width: 1080, height: 680 });
+    expect(strokes).toContain('#0F6E56');
+    expect(strokes).toContain('#6B7280');
+  });
+
+  it('AC-044: legend text never contains broken numbers', () => {
+    const { ctx, texts } = createRecordingContext();
+    drawChart(
+      ctx,
+      { title: 'A vs B', type: 'line', points, points2 },
+      { width: 1080, height: 680 },
+    );
+    for (const text of texts) {
+      expect(text).not.toContain('NaN');
+    }
+  });
+});

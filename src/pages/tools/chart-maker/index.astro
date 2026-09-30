@@ -21,7 +21,7 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
       <div class="bench__fields">
         <div class="bench__field">
           <label class="bench__label" for="chart-data">
-            Data
+            Series 1
           </label>
           <textarea
             class="chart-data"
@@ -35,6 +35,23 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
           ></textarea>
           <p class="bench__error" id="chart-data-error"></p>
           <p class="chart-notice" id="chart-notice" hidden></p>
+        </div>
+
+        <div class="bench__field">
+          <label class="bench__label" for="chart-data2">
+            Series 2 (optional)
+          </label>
+          <textarea
+            class="chart-data"
+            id="chart-data2"
+            name="data2"
+            rows="7"
+            spellcheck="false"
+            autocomplete="off"
+            aria-describedby="chart-data2-error"
+            placeholder={'Jan, 90\nFeb, 160\nMar, 210'}
+          ></textarea>
+          <p class="bench__error" id="chart-data2-error"></p>
         </div>
 
         <fieldset class="bench__field chart-type">
@@ -104,6 +121,11 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
         the box tells you which one and why.
       </p>
       <p class="tool__notes-body">
+        To compare two series (say 2024 against 2025), paste the second one into Series 2. Both
+        boxes need the same labels in the same order; pie charts show one series only. Series 2 is
+        drawn in grey, and the legend is part of the downloaded image.
+      </p>
+      <p class="tool__notes-body">
         Bar charts always start at zero, so the height of a bar is the size of its number. Line
         charts zoom in on the data and show the range on the axis. Pie slices are sorted largest
         first and labelled with their share; slices under 5% are not labelled because the labels
@@ -126,6 +148,7 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
   import { drawChart } from '@/lib/tools/chart-maker/draw';
   import { formatChartNumber } from '@/lib/tools/chart-maker/layout';
   import {
+    combineSeries,
     decodeState,
     encodeState,
     summarize,
@@ -138,12 +161,14 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
   function init(): void {
     const view = {
       data: document.querySelector('#chart-data') as HTMLTextAreaElement | null,
+      data2: document.querySelector('#chart-data2') as HTMLTextAreaElement | null,
       title: document.querySelector('#chart-title') as HTMLInputElement | null,
       canvas: document.querySelector('#chart-canvas') as HTMLCanvasElement | null,
       readout: document.querySelector('#readout') as HTMLOutputElement | null,
       note: document.querySelector('#readout-note') as HTMLParagraphElement | null,
       notice: document.querySelector('#chart-notice') as HTMLParagraphElement | null,
       dataError: document.querySelector('#chart-data-error') as HTMLParagraphElement | null,
+      data2Error: document.querySelector('#chart-data2-error') as HTMLParagraphElement | null,
       typeError: document.querySelector('#chart-type-error') as HTMLParagraphElement | null,
       titleError: document.querySelector('#chart-title-error') as HTMLParagraphElement | null,
       linkNote: document.querySelector('#link-note') as HTMLParagraphElement | null,
@@ -161,6 +186,8 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
       !view.note ||
       !view.notice ||
       !view.dataError ||
+      !view.data2 ||
+      !view.data2Error ||
       !view.typeError ||
       !view.titleError ||
       !view.linkNote ||
@@ -216,6 +243,7 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
       lastState = null;
 
       const data = parseChartData(view.data?.value ?? '');
+      const data2 = parseChartData(view.data2?.value ?? '');
       const title = parseTitle(view.title?.value ?? '');
       const checked = view.typeRadios.find((radio) => radio.checked);
       const type: ChartType | undefined = (CHART_TYPES as readonly string[]).includes(
@@ -227,15 +255,18 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
       if (view.data && view.dataError) {
         setError(view.data, view.dataError, data.ok ? '' : data.message);
       }
+      if (view.data2 && view.data2Error) {
+        setError(view.data2, view.data2Error, data2.ok ? '' : data2.message);
+      }
       if (view.title && view.titleError) {
         setError(view.title, view.titleError, title.ok ? '' : title.message);
       }
       if (view.notice) {
-        view.notice.hidden = !(data.ok && data.value.notice !== '');
-        view.notice.textContent = data.ok ? data.value.notice : '';
+        view.notice.hidden = true;
+        view.notice.textContent = '';
       }
 
-      if (!data.ok || !title.ok) {
+      if (!data.ok || !data2.ok || !title.ok) {
         renderPending('Paste at least two rows of data to see a chart.');
         syncUrl(null);
         return;
@@ -246,7 +277,26 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
         return;
       }
 
-      const check = validateForType(type, data.value.points);
+      // 两系列配对：行数、标签必须一致（BR-006）；不填系列 2 = 与 v1 完全一致。
+      const combined = combineSeries(data.value, data2.value);
+      if (!combined.ok) {
+        if (view.data2 && view.data2Error) {
+          setError(view.data2, view.data2Error, combined.message);
+        }
+        renderPending('Paste at least two rows of data to see a chart.');
+        syncUrl(null);
+        return;
+      }
+      if (view.data2 && view.data2Error) {
+        setError(view.data2, view.data2Error, '');
+      }
+      if (view.notice && combined.value.notice !== '') {
+        view.notice.hidden = false;
+        view.notice.textContent = combined.value.notice;
+      }
+
+      const points2 = combined.value.points2;
+      const check = validateForType(type, combined.value.points, points2);
       if (view.data && view.typeError) {
         setError(view.data, view.typeError, check.ok ? '' : check.message);
       }
@@ -256,7 +306,11 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
         return;
       }
 
-      lastState = { title: title.value, type, points: data.value.points };
+      // 单系列时不长出 points2 字段，分享链接保持 v1 形态（CR-001）。
+      lastState =
+        points2 === null
+          ? { title: title.value, type, points: combined.value.points }
+          : { title: title.value, type, points: combined.value.points, points2 };
       syncUrl(lastState);
 
       const encoded = encodeState(lastState).toString();
@@ -265,7 +319,7 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
       if (view.copyButton) view.copyButton.disabled = !linkFits;
       if (view.downloadButton) view.downloadButton.disabled = false;
 
-      const summary = summarize(lastState.points);
+      const summary = summarize(lastState.points, lastState.points2 ?? null);
       if (view.note && summary) {
         view.note.hidden = false;
         view.note.textContent = `${summary.count} points · highest ${formatChartNumber(summary.max.value)} (${summary.max.label})`;
@@ -335,6 +389,7 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
     });
 
     view.data?.addEventListener('input', render);
+    view.data2?.addEventListener('input', render);
     view.title?.addEventListener('input', render);
     for (const radio of view.typeRadios) radio.addEventListener('change', render);
 
@@ -342,6 +397,11 @@ const summary = 'Paste two columns of numbers, pick a chart, download the pictur
     const decoded = decodeState(new URLSearchParams(window.location.search));
     if (decoded && view.data) {
       view.data.value = decoded.points.map((point) => `${point.label}\t${point.value}`).join('\n');
+      if (view.data2) {
+        view.data2.value = (decoded.points2 ?? [])
+          .map((point) => `${point.label}\t${point.value}`)
+          .join('\n');
+      }
       view.title.value = decoded.title;
       const radio = view.typeRadios.find((element) => element.value === decoded.type);
       if (radio) radio.checked = true;

@@ -14,9 +14,11 @@ import { CHART_SHADES } from './index';
 import {
   computeAxisScale,
   computeBarLayout,
+  computeGroupedBarLayout,
   computeLineLayout,
   computePieLayout,
   formatChartNumber,
+  type BarBox,
   type PlotBox,
 } from './layout';
 
@@ -24,6 +26,8 @@ export interface ChartContent {
   title: string;
   type: ChartType;
   points: DataPoint[];
+  /** 第二数据系列（CR-001）。空 / null / 缺省 = 单系列，绘制与 v1 完全一致。 */
+  points2?: DataPoint[] | null;
 }
 
 export interface ChartDrawOptions {
@@ -43,6 +47,12 @@ const BG = '#FFFFFF';
 
 const FONT_STACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 const font = (px: number, weight = 400): string => `${weight} ${px}px ${FONT_STACK}`;
+
+/**
+ * 对比系列的中性灰（CR-001，BR-007）。与 tokens.css 的 `--chart-compare`
+ * 逐项一致——canvas 取不到 CSS 变量，改一处就要改两处。
+ */
+const CHART_COMPARE = '#6B7280';
 
 /**
  * 绘制一张完整图表：背景、可选标题、坐标轴、图形、数据标签、PlainKit 标识。
@@ -69,11 +79,17 @@ export function drawChart(
   const leftPad = 64 * s;
   const rightPad = 24 * s;
   const titleSpace = content.title === '' ? 0 : 56 * s;
+  // 双系列时顶部让出一行给图例（BR-007：图例随图与 PNG）。
+  const twoSeries =
+    content.type !== 'pie' && content.points2 !== undefined && content.points2 !== null
+      ? content.points2.length > 0
+      : false;
+  const legendSpace = twoSeries ? 40 * s : 0;
   const box: PlotBox = {
     left: leftPad,
-    top: 24 * s + titleSpace,
+    top: 24 * s + titleSpace + legendSpace,
     width: opts.width - leftPad - rightPad,
-    height: opts.height - (24 * s + titleSpace) - 56 * s,
+    height: opts.height - (24 * s + titleSpace + legendSpace) - 56 * s,
   };
 
   if (content.title !== '') {
@@ -81,6 +97,20 @@ export function drawChart(
     ctx.fillStyle = INK;
     ctx.textAlign = 'left';
     ctx.fillText(content.title, box.left, 28 * s);
+  }
+
+  if (twoSeries && content.points2) {
+    drawLegend(
+      ctx,
+      [
+        { color: CHART_SHADES[0] ?? CHART_COMPARE, text: 'Series 1' },
+        { color: CHART_COMPARE, text: 'Series 2' },
+      ],
+      opts.width - rightPad,
+      24 * s + titleSpace + legendSpace - 14 * s,
+      s,
+      measure,
+    );
   }
 
   if (content.type === 'pie') {
@@ -96,6 +126,36 @@ export function drawChart(
   ctx.fillText('PlainKit', opts.width - rightPad, opts.height - 20 * s);
 
   ctx.restore();
+}
+
+/** 画图例：色块 + 文字，从右往左排成一行（CR-001）。 */
+function drawLegend(
+  ctx: CanvasRenderingContext2D,
+  entries: { color: string; text: string }[],
+  rightEdge: number,
+  baselineY: number,
+  s: number,
+  measure: (text: string, px: number) => number,
+): void {
+  const swatch = 18 * s;
+  const gapInEntry = 8 * s;
+  const gapBetween = 24 * s;
+  ctx.font = font(14 * s);
+  let total = 0;
+  for (const entry of entries) {
+    total += swatch + gapInEntry + measure(entry.text, 14 * s);
+  }
+  total += gapBetween * (entries.length - 1);
+
+  let x = rightEdge - total;
+  ctx.textAlign = 'left';
+  for (const entry of entries) {
+    ctx.fillStyle = entry.color;
+    ctx.fillRect(x, baselineY - swatch, swatch, swatch);
+    ctx.fillStyle = MUTED;
+    ctx.fillText(entry.text, x + swatch + gapInEntry, baselineY);
+    x += swatch + gapInEntry + measure(entry.text, 14 * s) + gapBetween;
+  }
 }
 
 /** 画 Y 轴网格线与刻度值（柱状 / 折线共用）。 */
@@ -140,10 +200,54 @@ function drawAxisChart(
   s: number,
   measure: (text: string, px: number) => number,
 ): void {
+  const second = content.points2 ?? null;
+  const hasSecond = second !== null && second.length > 0;
   const values = content.points.map((point) => point.value);
+  if (hasSecond) values.push(...(second?.map((point) => point.value) ?? []));
   const scale = computeAxisScale(values, { zeroBased: content.type === 'bar' });
 
   if (content.type === 'bar') {
+    if (hasSecond && second) {
+      const layout = computeGroupedBarLayout(content.points, second, scale, box, measure, 14 * s);
+
+      drawAxis(ctx, layout.ticks, box, s);
+
+      // 0 基准线要画得比网格线重——它是正负值的分界（BR-005）。
+      ctx.strokeStyle = LINE_STRONG;
+      ctx.lineWidth = 1.5 * s;
+      ctx.beginPath();
+      ctx.moveTo(box.left, layout.zeroY);
+      ctx.lineTo(box.left + box.width, layout.zeroY);
+      ctx.stroke();
+
+      const seriesColors = [CHART_SHADES[0] ?? CHART_COMPARE, CHART_COMPARE];
+      const drawGroup = (bars: BarBox[], color: string): void => {
+        ctx.fillStyle = color;
+        for (const bar of bars) {
+          ctx.fillRect(bar.x, bar.y, bar.width, bar.height);
+        }
+      };
+      drawGroup(layout.bars1, seriesColors[0] ?? CHART_COMPARE);
+      drawGroup(layout.bars2, CHART_COMPARE);
+
+      if (layout.bars1[0]?.showValue) {
+        ctx.font = font(12 * s);
+        ctx.fillStyle = MUTED;
+        ctx.textAlign = 'center';
+        for (const bar of [...layout.bars1, ...layout.bars2]) {
+          const above = bar.value >= 0;
+          ctx.fillText(
+            formatChartNumber(bar.value),
+            bar.x + bar.width / 2,
+            above ? bar.y - 8 * s : bar.y + bar.height + 14 * s,
+          );
+        }
+      }
+
+      drawLabels(ctx, layout.labels, s);
+      return;
+    }
+
     const layout = computeBarLayout(content.points, scale, box, measure, 14 * s);
 
     drawAxis(ctx, layout.ticks, box, s);
@@ -182,25 +286,34 @@ function drawAxisChart(
   const layout = computeLineLayout(content.points, scale, box);
   drawAxis(ctx, layout.ticks, box, s);
 
-  ctx.strokeStyle = CHART_SHADES[0];
-  ctx.lineWidth = 3 * s;
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  layout.points.forEach((point, index) => {
-    if (index === 0) ctx.moveTo(point.x, point.y);
-    else ctx.lineTo(point.x, point.y);
-  });
-  ctx.stroke();
+  // 双折线：每条线一个颜色（CR-001）；单系列走 v1 路径。
+  const lineSeries: DataPoint[][] =
+    hasSecond && second ? [content.points, second] : [content.points];
+  const lineColors = [CHART_SHADES[0] ?? CHART_COMPARE, CHART_COMPARE];
+  for (let seriesIndex = 0; seriesIndex < lineSeries.length; seriesIndex += 1) {
+    const line = computeLineLayout(lineSeries[seriesIndex] ?? [], scale, box);
+    const color = lineColors[seriesIndex] ?? CHART_COMPARE;
 
-  for (const point of layout.points) {
-    ctx.fillStyle = BG;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3 * s;
+    ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.arc(point.x, point.y, 5 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = CHART_SHADES[0];
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, 3.5 * s, 0, Math.PI * 2);
-    ctx.fill();
+    line.points.forEach((point, index) => {
+      if (index === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    });
+    ctx.stroke();
+
+    for (const point of line.points) {
+      ctx.fillStyle = BG;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 5 * s, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 3.5 * s, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   ctx.font = font(14 * s);

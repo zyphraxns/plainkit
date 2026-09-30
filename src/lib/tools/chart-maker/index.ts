@@ -55,6 +55,11 @@ export interface ChartState {
   title: string;
   type: ChartType;
   points: DataPoint[];
+  /**
+   * 第二数据系列（CR-001）。缺省 / undefined / 空 = 单系列（v1 形态）——
+   * 解码旧链接时不得长出这个字段，否则旧分享链接的还原行为会漂移。
+   */
+  points2?: DataPoint[] | null;
 }
 
 const NUMBER_PATTERN = /^-?\d+(\.\d+)?$/;
