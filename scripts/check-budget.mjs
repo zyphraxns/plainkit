@@ -8,7 +8,7 @@
  *
  * 检查项：
  *   1. 首页 JS 必须为 0 字节（首页是纯索引）
- *   2. 任一工具页 JS ≤ 10KB（gzip）；全站硬上限 30KB
+ *   2. 任一工具页 JS ≤ 20KB（gzip，2026-09-30 用户裁定放宽，原 10KB）；硬上限 40KB
  *   3. 单页 CSS ≤ 12KB（gzip）
  *   4. HTML 体积上限（首页 15KB / 其他页 25KB，未压缩）
  *   5. dist 内的 HTML/CSS/JS 不得出现外部域名（零外部请求）
@@ -24,8 +24,8 @@ const KB = 1024;
 
 const BUDGET = {
   homeJsBytes: 0,
-  pageJsBytes: 10 * KB,
-  pageJsHardLimitBytes: 30 * KB,
+  pageJsBytes: 20 * KB,
+  pageJsHardLimitBytes: 40 * KB,
   cssBytes: 12 * KB,
   homeHtmlBytes: 15 * KB,
   pageHtmlBytes: 25 * KB,
@@ -166,7 +166,7 @@ for (const htmlFile of htmlFiles) {
     } else if (js > BUDGET.pageJsBytes) {
       fail(
         `${label} 的 JS ${human(js)} 超过目标 ${human(BUDGET.pageJsBytes)}。` +
-          `砍功能或砍依赖，不要放宽预算。`,
+          `先精简实现；确需突破目标但不超硬上限的，须用户裁定并同步 DESIGN.md §13.1。`,
       );
     }
     if (rawHtml > BUDGET.pageHtmlBytes) {
@@ -274,7 +274,9 @@ console.log('');
 if (failures.length > 0) {
   console.error(`✗ 未通过，共 ${failures.length} 项：\n`);
   for (const message of failures) console.error(`  · ${message}`);
-  console.error('\n裁决规则：性能优先。砍掉视觉方案，不要放宽 specs/DESIGN.md §13 的预算。');
+  console.error(
+    '\n裁决规则：性能优先。硬上限（DESIGN.md §13.1）不可通过实现手段绕过；目标的放宽只能由用户裁定并落档。',
+  );
   process.exit(1);
 }
 
