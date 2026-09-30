@@ -3,8 +3,8 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 
 const pageTitle = 'Typing speed test';
 const description =
-  'Type for 60 seconds and get your words per minute, accuracy and a result card you can download or share. Free, no ads, nothing leaves your device.';
-const summary = 'Type for 60 seconds, get your speed and a shareable result card.';
+  'Practice typing with a built-in passage or your own text, pick a duration and get your words per minute, accuracy and a result card to download or share. Free, no ads, nothing leaves your device.';
+const summary = 'Measure your typing speed and get a result card.';
 ---
 
 <BaseLayout title={pageTitle} description={description} tool="typing-test">
@@ -20,41 +20,151 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
 
       <div class="typing-stage">
         <!--
-          五段内置短文（BR-005）：写在 HTML 里而不是 JS 里——词表零 JS 体积，
-          且禁用 JS 时第一段仍然可见（AC-022）。JS 启动后整组隐藏，文本渲染进
-          上面的打字区。
+          选择器行（CR-002 / AC-039）：模式、难度（仅内置模式显示）、时长。
+          pill 单选：input 覆盖整个 pill（触控区 ≥ 44px），checked 态走兄弟选择器。
+          切换不播放任何动效（BR-010）。
+        -->
+        <div class="selector-row" id="selector-row">
+          <div class="selector" role="radiogroup" aria-label="Text source" id="mode-selector">
+            <span class="selector__label">Text</span>
+            <label class="chip">
+              <input type="radio" name="mode" value="built-in" checked />
+              <span>Built-in text</span>
+            </label>
+            <label class="chip">
+              <input type="radio" name="mode" value="custom" />
+              <span>Your text</span>
+            </label>
+          </div>
+          <div class="selector" role="radiogroup" aria-label="Difficulty" id="tier-selector">
+            <span class="selector__label">Difficulty</span>
+            <label class="chip">
+              <input type="radio" name="tier" value="easy" checked />
+              <span>Easy</span>
+            </label>
+            <label class="chip">
+              <input type="radio" name="tier" value="advanced" />
+              <span>Advanced</span>
+            </label>
+          </div>
+          <div
+            class="selector"
+            role="radiogroup"
+            aria-label="Duration in seconds"
+            id="duration-selector"
+          >
+            <span class="selector__label">Seconds</span>
+            <label class="chip">
+              <input type="radio" name="duration" value="15" />
+              <span>15</span>
+            </label>
+            <label class="chip">
+              <input type="radio" name="duration" value="30" />
+              <span>30</span>
+            </label>
+            <label class="chip">
+              <input type="radio" name="duration" value="60" checked />
+              <span>60</span>
+            </label>
+            <label class="chip">
+              <input type="radio" name="duration" value="120" />
+              <span>120</span>
+            </label>
+          </div>
+        </div>
+
+        <!--
+          自定义文本（CR-002 / AC-040 / AC-041）：粘贴框 + 就地报错。
+          字号 16px（iOS 底线）；换行与连续空格由 JS 清洗成单空格（BR-005）。
+        -->
+        <div class="custom-panel" id="custom-panel" hidden>
+          <label class="custom-panel__label" for="custom-text">
+            Your text
+          </label>
+          <textarea
+            class="custom-textarea"
+            id="custom-text"
+            rows="4"
+            placeholder="Paste the text you want to practice."
+          ></textarea>
+          <p class="field-error" id="custom-error" hidden role="alert"></p>
+        </div>
+
+        <!--
+          内置短文（BR-005，CR-002 扩为两档各 5 段）：写在 HTML 里而不是 JS 里——
+          词表零 JS 体积，且禁用 JS 时第一段仍然可见（AC-022）。JS 启动后整组隐藏。
         -->
         <div class="typing-passages" id="typing-passages">
-          <p class="typing-passage">
+          <p class="typing-passage" data-tier="easy">
             The quickest way to get better at something is to pay attention while you do it. Every
             sentence you type is a small exercise in rhythm and control. Try to keep your eyes on
             the screen instead of the keyboard, and let your fingers find the letters on their own.
             Speed comes later; steady accuracy is what carries you through.
           </p>
-          <p class="typing-passage">
+          <p class="typing-passage" data-tier="easy">
             A good morning routine does not have to be long. Ten quiet minutes with a cup of coffee
             and a short list of plans can set the tone for the whole day. The goal is not to fill
             every hour with work. It is to begin with a clear head, one small step at a time, and
             let the rest follow.
           </p>
-          <p class="typing-passage">
+          <p class="typing-passage" data-tier="easy">
             Cities change slowly, then all at once. A shop closes, a park opens, a new line appears
             on the map, and one day you notice the street looks nothing like the one you remember.
             Most people miss the middle part of the story. They only see the beginning and the end,
             and they wonder where the years went. It pays to look around.
           </p>
-          <p class="typing-passage">
+          <p class="typing-passage" data-tier="easy">
             Learning to cook is mostly learning to read a recipe twice before you start. Get the pan
             warm, chop everything first, and keep the salt within reach. Small habits like these
             turn a stressful evening into a calm one. Nobody cooks well in a rush, and the food
             always knows when you hurried. A calm kitchen is a happy kitchen.
           </p>
-          <p class="typing-passage">
+          <p class="typing-passage" data-tier="easy">
             The library was quiet in the way that only rainy afternoons can be. Someone turned a
             page two tables away, the heating hummed against the window, and the light outside
             turned soft and grey. She wrote one sentence, crossed it out, then wrote it again,
             slightly better, and decided that this was enough progress for one day. Rain has that
             effect on people.
+          </p>
+          <p class="typing-passage" data-tier="advanced">
+            Although the evidence remains inconclusive, several researchers argue that conventional
+            explanations overlook the subtle interplay between environment and behaviour. Their
+            argument rests on a simple observation: when circumstances shift gradually, people adapt
+            without noticing, yet a sudden disruption reveals how fragile those accustomed patterns
+            truly were. Critics, meanwhile, caution that replication efforts have produced mixed
+            results at best. Whether this holds beyond the laboratory remains an open question.
+          </p>
+          <p class="typing-passage" data-tier="advanced">
+            The manuscript had been gathering dust in an ordinary cardboard box when the archivist
+            recognised the handwriting. Authenticating such documents demands patience: ink
+            composition, paper texture and marginal annotations must each be examined under
+            magnification. Skepticism is appropriate here, because extraordinary claims require
+            extraordinary scrutiny, and the history of discovery is largely a history of elaborate
+            forgeries exposed by diligent, unglamorous verification.
+          </p>
+          <p class="typing-passage" data-tier="advanced">
+            Consider how quickly an unfamiliar neighbourhood becomes ordinary. Within a fortnight
+            the awkward detours disappear, the corner shop acquires a name, and the route home no
+            longer requires concentration. Psychologists describe this transition as the ordinary
+            becoming invisible, yet the process remains remarkably poorly understood. What we
+            notice, remember and ultimately inhabit is a fraction of what surrounds us, filtered by
+            attention.
+          </p>
+          <p class="typing-passage" data-tier="advanced">
+            Revenue figures alone seldom explain why a small enterprise thrives while its
+            competitors decline. Reliability matters: suppliers who deliver precisely when promised,
+            employees who understand the trade thoroughly, and customers who return because the
+            experience never surprises them unpleasantly. None of these advantages appears dramatic
+            in isolation. Together, accumulated patiently over years, they constitute a defence that
+            rivals cannot easily replicate.
+          </p>
+          <p class="typing-passage" data-tier="advanced">
+            Astronomers spent decades arguing about whether those faint signals originated within
+            our galaxy or beyond it. The dispute seemed academic until improved instruments settled
+            the matter, revealing a universe considerably stranger than anyone had anticipated.
+            Entire categories of objects had simply been invisible. The lesson generalises
+            uncomfortably well: our ignorance is rarely a blank space on the map; it is coastline
+            drawn confidently in the wrong place.
           </p>
         </div>
 
@@ -107,34 +217,41 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       </output>
 
       <div class="tool__actions">
-        <button type="button" class="btn" data-variant="primary" id="copy-link" disabled>
-          Copy link
-        </button>
-        <button type="button" class="btn" id="download-image" disabled>
-          Download image
-        </button>
+        <p class="share-note" id="share-note" hidden>
+          The link contains your text.
+        </p>
+        <div class="tool__buttons">
+          <button type="button" class="btn" data-variant="primary" id="copy-link" disabled>
+            Copy link
+          </button>
+          <button type="button" class="btn" id="download-image" disabled>
+            Download image
+          </button>
+        </div>
       </div>
     </section>
 
     <section class="tool__notes">
       <h2 class="tool__notes-title">How this works</h2>
       <p class="tool__notes-body">
-        Press Start and the 60-second timer begins right away. Type the text you see; wrong
-        characters turn red and underlined but never stop you, and backspace works as usual. You can
-        press End early once at least 15 seconds have passed — shorter runs are too small a sample
-        to be worth a number.
+        Pick a passage or paste your own text, choose a duration from 15 to 120 seconds, and press
+        Start — the timer begins right away. Type the text you see; wrong characters turn red and
+        underlined but never stop you, and backspace works as usual. You can press End early once at
+        least 15 seconds have passed — shorter runs are too small a sample to be worth a number.
+        Newlines and extra spaces in your own text are collapsed automatically.
       </p>
       <p class="tool__notes-body">
         Your speed is counted the standard way: five characters make one word, backspaced characters
         do not count, and accuracy is the share of characters you got right. Nothing is saved
-        anywhere — close the tab and the result is gone.
+        anywhere — close the tab and your text and result are gone.
       </p>
 
       <h2 class="tool__notes-title">Sharing</h2>
       <p class="tool__notes-body">
         Download image saves a result card with a small PlainKit mark in the corner. Copy link puts
-        your result into the link itself — anyone who opens it sees the same card, and nothing ever
-        touches a server.
+        your result into the link itself — anyone who opens it sees the same card. If you practiced
+        your own text, the link also carries that text, so anyone who opens it sees exactly what you
+        typed. Nothing ever touches a server.
       </p>
     </section>
   </article>
@@ -144,19 +261,21 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
   import {
     buildTargetBuffer,
     computeStats,
+    CUSTOM_TEXT_MAX_CHARS,
+    DEFAULT_DURATION,
     decodeResult,
     diffTyping,
+    DURATIONS,
     encodeResult,
     formatResultLabels,
     needsMoreTarget,
+    normalizeCustomText,
     ratingFor,
+    type SharedResult,
     type TargetBuffer,
     type TypingStats,
   } from '@/lib/tools/typing-test';
   import { drawResultCard } from '@/lib/shared/canvas-card';
-
-  /** 测试时长（BR-001）。 */
-  const DURATION_MS = 60000;
 
   /**
    * 取必填元素；缺失直接抛给顶层 catch 静默降级——页面回到「无 JS 也可读」
@@ -182,23 +301,50 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
     const control = requireElement<HTMLButtonElement>('#test-control');
     const copyButton = requireElement<HTMLButtonElement>('#copy-link');
     const downloadButton = requireElement<HTMLButtonElement>('#download-image');
+    const tierSelector = requireElement<HTMLDivElement>('#tier-selector');
+    const customPanel = requireElement<HTMLDivElement>('#custom-panel');
+    const textarea = requireElement<HTMLTextAreaElement>('#custom-text');
+    const errorLine = requireElement<HTMLParagraphElement>('#custom-error');
+    const shareNote = requireElement<HTMLParagraphElement>('#share-note');
 
     const passageNodes = document.querySelectorAll<HTMLParagraphElement>('.typing-passage');
     if (passageNodes.length === 0) throw new Error('typing-test: no passages in page');
 
-    // 段落来自本页 HTML；规范化空白，杜绝源码缩进混进文本（BR-005）。
-    const passages = Array.from(passageNodes, (element) =>
-      (element.textContent ?? '').replace(/\s+/g, ' ').trim(),
-    );
+    // 段落来自本页 HTML，按档分组（CR-002 / BR-005）；规范化空白，杜绝源码缩进混进文本。
+    const easyPassages: string[] = [];
+    const advancedPassages: string[] = [];
+    for (const node of passageNodes) {
+      const text = (node.textContent ?? '').replace(/\s+/g, ' ').trim();
+      if (node.dataset.tier === 'advanced') advancedPassages.push(text);
+      else easyPassages.push(text);
+    }
+    if (easyPassages.length === 0) throw new Error('typing-test: no easy passages in page');
 
     type Phase = 'idle' | 'running' | 'done' | 'shared';
+    type Mode = 'built-in' | 'custom';
+    type Tier = 'easy' | 'advanced';
+
     let phase: Phase = 'idle';
+    /** 当前设置（CR-002）：模式 / 难度 / 时长，均由选择器决定。 */
+    let mode: Mode = 'built-in';
+    let tier: Tier = 'easy';
+    let duration: number = DEFAULT_DURATION;
+    /** 自定义模式的清洗后文本；空串表示还没有有效文本。 */
+    let customText = '';
     let currentIndex = 0;
     let buffer: TargetBuffer | null = null;
     let spans: HTMLSpanElement[] = [];
     let startedAt = 0;
     let timerId = 0;
     let lastStats: TypingStats | null = null;
+
+    /** 本次测试的目标文本源：内置 = 所选档的 5 段；自定义 = 同一段循环（AC-043）。
+     *  自定义源带一个尾随空格：循环拼接处是「dog the」而不是「dogthe」——
+     *  短词表反复练时没有这个空格，续打必错。 */
+    function currentSource(): readonly string[] {
+      if (mode === 'custom') return customText === '' ? [] : [`${customText} `];
+      return tier === 'easy' ? easyPassages : advancedPassages;
+    }
 
     function setClock(seconds: number): void {
       clock.textContent = String(seconds);
@@ -237,6 +383,13 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       note.textContent = message;
       copyButton.disabled = true;
       downloadButton.disabled = true;
+      updateShareNote();
+    }
+
+    /** 隐私提示（CR-002 / AC-045）：自定义模式且卡可见时提醒链接携带全文。 */
+    function updateShareNote(): void {
+      const settled = phase === 'done' || phase === 'shared';
+      shareNote.hidden = !(mode === 'custom' && settled && lastStats !== null);
     }
 
     /** 预览与导出走同一个 drawResultCard（AC-011 / AC-012 / AC-029）。
@@ -258,7 +411,7 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       });
     }
 
-    function showResult(stats: TypingStats, textIndex: number): void {
+    function showResult(stats: TypingStats): void {
       lastStats = stats;
       const labels = formatResultLabels(stats);
       readoutValue.hidden = false;
@@ -275,13 +428,30 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
 
       copyButton.disabled = false;
       downloadButton.disabled = false;
-      syncUrl({ textIndex, wpm: stats.wpm, accuracy: stats.accuracy, seconds: stats.seconds });
+      // 分享参数（CR-002 / BR-009）：内置 = 档位 + 序号 + 时长；自定义 = 全文 + 时长
+      const shared: SharedResult =
+        mode === 'custom'
+          ? {
+              customText,
+              wpm: stats.wpm,
+              accuracy: stats.accuracy,
+              seconds: stats.seconds,
+              duration,
+            }
+          : {
+              textIndex: currentIndex,
+              tier,
+              wpm: stats.wpm,
+              accuracy: stats.accuracy,
+              seconds: stats.seconds,
+              duration,
+            };
+      syncUrl(shared);
+      updateShareNote();
     }
 
     /** 把成绩写进地址栏（Copy link 的基础）；离开结果态时清掉。 */
-    function syncUrl(
-      result: { textIndex: number; wpm: number; accuracy: number; seconds: number } | null,
-    ): void {
+    function syncUrl(result: SharedResult | null): void {
       const url = new URL(window.location.href);
       url.search = result ? encodeResult(result).toString() : '';
       window.history.replaceState(null, '', url);
@@ -291,12 +461,12 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       phase = 'running';
       lastStats = null;
       syncUrl(null);
-      buffer = buildTargetBuffer(passages, currentIndex, 1);
+      buffer = buildTargetBuffer(currentSource(), currentIndex, 1);
       renderTrack();
       input.value = '';
       input.disabled = false;
       paint(diffTyping(buffer.text, ''), 0);
-      setClock(DURATION_MS / 1000);
+      setClock(duration);
       control.textContent = 'End early';
       renderPending('The timer is running. Press Escape to end early.');
       // 点 Start（或按 Enter）后视口回到打字区，不让用户再手动找输入位置（AC-038）。
@@ -311,12 +481,19 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
 
     // ── 快捷键（CR-001 / AC-037）：Enter = 开始/再来一次，Escape = 提前结束 ──
     // 焦点在按钮/链接上时不拦截，让原生激活生效（焦点在 Copy link 上按 Enter
-    // 必须还是复制，不能被全局快捷键劫持）。
+    // 必须还是复制，不能被全局快捷键劫持）。CR-002：焦点在选择器 radio 或
+    // 粘贴框里时同样不拦——radio 用方向键切换、粘贴框里按 Enter 是换行，
+    // 都不能误触测试控制（AC-054）。
     window.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
       const target = event.target as HTMLElement | null;
       const onActivator =
-        target !== null && (target.tagName === 'BUTTON' || target.tagName === 'A');
+        target !== null &&
+        (target.tagName === 'BUTTON' ||
+          target.tagName === 'A' ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT');
       if (
         event.key === 'Enter' &&
         !onActivator &&
@@ -332,18 +509,20 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
 
     function tick(): void {
       const elapsed = Date.now() - startedAt;
-      setClock(Math.max(0, Math.ceil((DURATION_MS - elapsed) / 1000)));
-      if (elapsed >= DURATION_MS) finish();
+      setClock(Math.max(0, Math.ceil((duration * 1000 - elapsed) / 1000)));
+      if (elapsed >= duration * 1000) finish();
     }
 
-    /** typed 逼近 buffer 末尾时续接下一段（AC-018），计时不中断。 */
+    /** typed 逼近 buffer 末尾时续接下一段（AC-018），计时不中断。
+     *  自定义模式：source 只有同一段，续接即循环（AC-043）。 */
     function extendBufferIfNeeded(): void {
       if (!buffer || !needsMoreTarget(buffer.text.length, input.value.length)) return;
-      const next = passages[buffer.nextIndex];
+      const source = currentSource();
+      const next = source[buffer.nextIndex];
       if (next === undefined) return;
       buffer = {
         text: buffer.text + next,
-        nextIndex: (buffer.nextIndex + 1) % passages.length,
+        nextIndex: (buffer.nextIndex + 1) % source.length,
       };
       renderTrack();
       paint(diffTyping(buffer.text, input.value), input.value.length);
@@ -353,8 +532,8 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       window.clearInterval(timerId);
       phase = 'done';
       input.disabled = true;
-      const elapsed = Math.min(Date.now() - startedAt, DURATION_MS);
-      setClock(Math.ceil((DURATION_MS - elapsed) / 1000));
+      const elapsed = Math.min(Date.now() - startedAt, duration * 1000);
+      setClock(Math.ceil((duration * 1000 - elapsed) / 1000));
       control.textContent = 'Try again';
 
       const stats = computeStats(buffer?.text ?? '', input.value, elapsed);
@@ -363,24 +542,51 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
         lastStats = null;
         renderPending(stats.message);
         syncUrl(null);
+        updateShareNote();
         return;
       }
-      showResult(stats.value, currentIndex);
+      showResult(stats.value);
     }
 
     function resetToIdle(nextIndex: number): void {
+      window.clearInterval(timerId);
       phase = 'idle';
-      currentIndex = ((nextIndex % passages.length) + passages.length) % passages.length;
       lastStats = null;
-      buffer = buildTargetBuffer(passages, currentIndex, 1);
+
+      // 自定义模式还没有有效文本：打字区留空、Start 置灰（AC-040 / AC-051）。
+      if (mode === 'custom' && customText === '') {
+        currentIndex = 0;
+        buffer = null;
+        track.replaceChildren();
+        spans = [];
+        input.value = '';
+        input.disabled = true;
+        input.maxLength = CUSTOM_TEXT_MAX_CHARS;
+        setClock(duration);
+        control.textContent = 'Start';
+        control.disabled = true;
+        renderPending('Paste a text above, then press Start to practice it.');
+        syncUrl(null);
+        return;
+      }
+
+      const source = currentSource();
+      const count = source.length;
+      currentIndex = mode === 'custom' ? 0 : ((nextIndex % count) + count) % count;
+      buffer = buildTargetBuffer(source, currentIndex, 1);
       renderTrack();
       input.value = '';
       input.disabled = true;
       input.maxLength = buffer.text.length;
       paint(diffTyping(buffer.text, ''), 0);
-      setClock(DURATION_MS / 1000);
+      setClock(duration);
       control.textContent = 'Start';
-      renderPending('Press Start or Enter, then type the text above as carefully as you can.');
+      control.disabled = false;
+      renderPending(
+        mode === 'custom'
+          ? 'Press Start or Enter, then type your text as carefully as you can.'
+          : 'Press Start or Enter, then type the text above as carefully as you can.',
+      );
       syncUrl(null);
     }
 
@@ -389,6 +595,69 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       if (phase === 'idle' || phase === 'shared') start();
       else if (phase === 'running') finish();
       else resetToIdle(currentIndex + 1);
+    });
+
+    // ── 选择器（CR-002 / AC-039 / AC-049）：任何时刻切换都回到初始态 ──
+    function setChecked(name: string, value: string): void {
+      const radio = document.querySelector<HTMLInputElement>(
+        `input[name="${name}"][value="${value}"]`,
+      );
+      if (radio) radio.checked = true;
+    }
+
+    const modeRadios = document.querySelectorAll<HTMLInputElement>('input[name="mode"]');
+    const tierRadios = document.querySelectorAll<HTMLInputElement>('input[name="tier"]');
+    const durationRadios = document.querySelectorAll<HTMLInputElement>('input[name="duration"]');
+    if (modeRadios.length === 0 || tierRadios.length === 0 || durationRadios.length === 0) {
+      throw new Error('typing-test: selector radios missing');
+    }
+
+    for (const radio of modeRadios) {
+      radio.addEventListener('change', () => {
+        mode = radio.value === 'custom' ? 'custom' : 'built-in';
+        // 难度切换仅内置模式显示（AC-040）；粘贴框仅自定义模式显示。
+        tierSelector.hidden = mode === 'custom';
+        customPanel.hidden = mode !== 'custom';
+        updateShareNote();
+        resetToIdle(0);
+      });
+    }
+
+    for (const radio of tierRadios) {
+      radio.addEventListener('change', () => {
+        tier = radio.value === 'advanced' ? 'advanced' : 'easy';
+        // 换档从该档第 1 段重新开始（AC-042）。
+        resetToIdle(0);
+      });
+    }
+
+    for (const radio of durationRadios) {
+      radio.addEventListener('change', () => {
+        const parsed = Number(radio.value);
+        duration = (DURATIONS as readonly number[]).includes(parsed) ? parsed : DEFAULT_DURATION;
+        resetToIdle(currentIndex);
+      });
+    }
+
+    // ── 自定义文本（CR-002 / AC-041 / AC-050 / AC-051）：清洗 + 就地报错 ──
+    textarea.addEventListener('input', () => {
+      const result = normalizeCustomText(textarea.value);
+      if (result.status === 'ok') {
+        customText = result.text;
+        errorLine.hidden = true;
+      } else {
+        customText = '';
+        if (result.status === 'too-long') {
+          errorLine.textContent =
+            `Your text is over the ${CUSTOM_TEXT_MAX_CHARS}-character limit. ` +
+            'Shorten it — the limit applies after extra spaces are collapsed.';
+          errorLine.hidden = false;
+        } else {
+          errorLine.hidden = true;
+        }
+      }
+      // 编辑文本 = 改变测试输入：任何时候都回初始态（AC-049 同款语义）。
+      resetToIdle(0);
     });
 
     // ── 输入：字符串即状态，退格/粘贴交给浏览器（AC-004 / 005 / 017）──
@@ -454,12 +723,28 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       }, 'image/png');
     });
 
-    // ── 分享链接：合法参数 → 直接还原同一张卡（AC-012）──
+    // ── 分享链接：合法参数 → 直接还原同一张卡（AC-012；CR-002 扩展两种模式）──
     const shared = decodeResult(new URLSearchParams(window.location.search));
     if (shared) {
       phase = 'shared';
-      currentIndex = shared.textIndex;
-      buffer = buildTargetBuffer(passages, currentIndex, 1);
+      // 旧链接（无 d 字段）回落 60 秒；非法档位回落 easy（BR-009）。
+      duration = shared.duration ?? DEFAULT_DURATION;
+      if (shared.customText !== undefined) {
+        // 自定义模式还原（AC-045）：粘贴框填回原文，可直接再练一遍。
+        mode = 'custom';
+        customText = shared.customText;
+        tierSelector.hidden = true;
+        customPanel.hidden = false;
+        setChecked('mode', 'custom');
+        textarea.value = customText;
+        currentIndex = 0;
+      } else {
+        tier = shared.tier ?? 'easy';
+        currentIndex = shared.textIndex ?? 0;
+        setChecked('tier', tier);
+      }
+      setChecked('duration', String(duration));
+      buffer = buildTargetBuffer(currentSource(), currentIndex, 1);
       passageGroup.setAttribute('data-live', '');
       renderTrack();
       input.maxLength = buffer.text.length;
@@ -482,7 +767,8 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
       copyButton.disabled = false;
       downloadButton.disabled = false;
       control.textContent = 'Try it yourself';
-      setClock(DURATION_MS / 1000);
+      setClock(duration);
+      updateShareNote();
     } else {
       resetToIdle(0);
     }
@@ -617,5 +903,125 @@ const summary = 'Type for 60 seconds, get your speed and a shareable result card
   .readout.is-entering {
     opacity: 0;
     transform: translateY(6px);
+  }
+
+  /* ── CR-002：选择器行（AC-039）──────────────────────────────────────
+     pill 单选：透明 input 铺满整个 pill（触控区 ≥ 44px，AC-056），
+     checked / focus 态走兄弟选择器；切换零动效（BR-010）。 */
+  .selector-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3) var(--space-5);
+  }
+
+  .selector {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .selector[hidden] {
+    display: none;
+  }
+
+  .selector__label {
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+    margin-right: var(--space-1);
+  }
+
+  .chip {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .chip input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .chip span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+  }
+
+  .chip input:checked + span {
+    color: var(--accent-hover);
+    font-weight: 600;
+    background: var(--accent-wash);
+    border-color: var(--accent);
+  }
+
+  .chip input:focus-visible + span {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ── CR-002：自定义文本粘贴框（AC-040）──────────────────────────── */
+  .custom-panel {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .custom-panel[hidden] {
+    display: none;
+  }
+
+  .custom-panel__label {
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+  }
+
+  .custom-textarea {
+    width: 100%;
+    min-height: 7em;
+    padding: var(--space-3) var(--space-4);
+    font: inherit;
+    font-size: var(--text-base); /* iOS 聚焦不放大（BR-010） */
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-md);
+    resize: vertical;
+  }
+
+  .custom-textarea:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .field-error {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--danger);
+  }
+
+  /* 隐私提示（AC-045）：贴在产物按钮上方 */
+  .share-note {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+  }
+
+  .share-note[hidden] {
+    display: none;
+  }
+
+  .tool__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
   }
 </style>

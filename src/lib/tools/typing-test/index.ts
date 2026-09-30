@@ -145,7 +145,10 @@ export function buildTargetBuffer(
   let index = ((startIndex % count) + count) % count;
   let text = '';
   let appended = 0;
-  while (text.length < minChars && appended < count * 2) {
+  // 护栏：每次整段拼入至少增加 1 个字符，minChars 次必达上限——既防死循环
+  // （词库被塞进空字符串时），也允许单元素词库（CR-002 自定义循环）反复拼到
+  // 任意 minChars。原来的 `count * 2` 上限挡住了单元素词库的循环。
+  while (text.length < minChars && appended < minChars) {
     text += passages[index];
     index = (index + 1) % count;
     appended += 1;
@@ -165,20 +168,55 @@ export function needsMoreTarget(
   return typedLength > textLength - threshold;
 }
 
-/** 分享链接携带的成绩（BR-009）：只编 4 个数，文本由序号在本机页面里还原。 */
+/** 分享链接携带的成绩（BR-009，CR-002 扩展）。
+ *  新增字段全部可选：旧链接（无新字段）decode 后不含新键，行为与 v1 一致。 */
+export type SharedTier = 'easy' | 'advanced';
+
 export interface SharedResult {
-  textIndex: number;
+  /** 内置模式：档内段落序号。自定义模式不设置。 */
+  textIndex?: number | undefined;
+  /** 内置模式：难度档。缺省 = easy（v1 旧链接回落）。 */
+  tier?: SharedTier | undefined;
+  /** 自定义模式：清洗后的全文。设置时 textIndex / tier 不参与还原。 */
+  customText?: string | undefined;
+  /** 所选时长（秒，四档之一）。缺省 = 60（v1 旧链接回落）。 */
+  duration?: number | undefined;
   wpm: number;
   accuracy: number;
   seconds: number;
 }
+
+/** 自定义文本清洗后的长度上限（AC-050，2026-09-30 用户确认）。 */
+export const CUSTOM_TEXT_MAX_CHARS = 1000;
+
+/** 清洗结果状态：ok / 空白（AC-051）/ 超限（AC-050）。 */
+export type CustomTextStatus = 'ok' | 'empty' | 'too-long';
+
+/**
+ * 自定义文本清洗（CR-002）：换行与连续空白压成单个空格、去首尾（AC-041）。
+ * 非拉丁字符原样保留（AC-052）；不校验内容本身，只判空与长度。
+ */
+export function normalizeCustomText(
+  raw: string,
+): { status: 'ok'; text: string } | { status: 'empty' | 'too-long' } {
+  const text = raw.replace(/\s+/g, ' ').trim();
+  if (text.length === 0) return { status: 'empty' };
+  if (text.length > CUSTOM_TEXT_MAX_CHARS) return { status: 'too-long' };
+  return { status: 'ok', text };
+}
+
+/** 时长四档（BR-001，CR-002）：唯一的合法时长集合，之外一律回落 60。 */
+export const DURATIONS = [15, 30, 60, 120] as const;
+export type Duration = (typeof DURATIONS)[number];
+export const DEFAULT_DURATION: Duration = 60;
 
 /** decodeResult 的合法性范围：越界一律当无效分享链接处理（URL 参数不可信）。 */
 const SHARED_LIMITS = {
   maxWpm: 300,
   maxAccuracy: 100,
   minSeconds: MIN_RESULT_SECONDS,
-  maxSeconds: 60,
+  /** CR-002：120 秒档上线后，分享链接的用时上限同步放宽（AC-053）。 */
+  maxSeconds: 120,
   maxTextIndex: 999,
 } as const;
 
@@ -195,22 +233,46 @@ function parseSharedInt(
   return value;
 }
 
-/** 编码分享参数（BR-009）。 */
+/** 编码分享参数（BR-009）。新字段只在有值时写入，保证旧编码输出不变。 */
 export function encodeResult(result: SharedResult): URLSearchParams {
   const params = new URLSearchParams();
-  params.set('t', String(result.textIndex));
+  if (result.customText !== undefined) params.set('x', result.customText);
+  else if (result.textIndex !== undefined) params.set('t', String(result.textIndex));
+  if (result.tier !== undefined) params.set('r', result.tier);
+  if (result.duration !== undefined) params.set('d', String(result.duration));
   params.set('w', String(result.wpm));
   params.set('a', String(result.accuracy));
   params.set('s', String(result.seconds));
   return params;
 }
 
-/** 解码分享参数；任何一步不合法都返回 null（页面退回正常测试态，不报错）。 */
+/** 解码分享参数；任何一步不合法都返回 null（页面退回正常测试态，不报错）。
+ *  CR-002 的新可选字段例外：存在但非法时**丢弃该字段**而不是整体判废——
+ *  旧版本构造的链接不至于因为新字段被机器人改坏而整条失效（AC-056）。 */
 export function decodeResult(params: URLSearchParams): SharedResult | null {
-  const textIndex = parseSharedInt(params, 't', 0, SHARED_LIMITS.maxTextIndex);
   const wpm = parseSharedInt(params, 'w', 0, SHARED_LIMITS.maxWpm);
   const accuracy = parseSharedInt(params, 'a', 0, SHARED_LIMITS.maxAccuracy);
   const seconds = parseSharedInt(params, 's', SHARED_LIMITS.minSeconds, SHARED_LIMITS.maxSeconds);
-  if (textIndex === null || wpm === null || accuracy === null || seconds === null) return null;
-  return { textIndex, wpm, accuracy, seconds };
+  if (wpm === null || accuracy === null || seconds === null) return null;
+
+  const customRaw = params.get('x');
+  if (customRaw !== null) {
+    const custom = normalizeCustomText(customRaw);
+    if (custom.status !== 'ok') return null;
+    return { customText: custom.text, wpm, accuracy, seconds, duration: parseDuration(params) };
+  }
+
+  const textIndex = parseSharedInt(params, 't', 0, SHARED_LIMITS.maxTextIndex);
+  if (textIndex === null) return null;
+
+  const tierRaw = params.get('r');
+  const tier = tierRaw === 'easy' || tierRaw === 'advanced' ? tierRaw : undefined;
+  return { textIndex, wpm, accuracy, seconds, tier, duration: parseDuration(params) };
+}
+
+/** 时长只认四档；缺省或非法都返回 undefined（页面回落 60，AC-056）。 */
+function parseDuration(params: URLSearchParams): Duration | undefined {
+  const value = parseSharedInt(params, 'd', 0, SHARED_LIMITS.maxSeconds);
+  if (value === null) return undefined;
+  return (DURATIONS as readonly number[]).includes(value) ? (value as Duration) : undefined;
 }
